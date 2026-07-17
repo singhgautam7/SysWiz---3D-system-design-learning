@@ -61,7 +61,15 @@ export function NotesDrawer({
 
   const otherNotes = Object.entries(notesForLesson)
     .map(([idxStr, n]) => ({ idx: Number(idxStr), note: n }))
-    .filter(({ idx, note }) => idx !== activeStep && note.md.trim())
+    .filter(({ idx, note }) => {
+      return (
+        !isNaN(idx) &&
+        idx !== activeStep &&
+        note &&
+        typeof note.md === "string" &&
+        note.md.trim() !== ""
+      );
+    })
     .sort((a, b) => a.idx - b.idx);
 
   if (!open) return null;
@@ -291,7 +299,8 @@ function NoteEditorCard({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Write notes in Markdown… **bold**, *italic*, `code`, - lists"
-          className="min-h-[140px] max-h-[240px] resize-none bg-transparent text-[13px] leading-relaxed text-text outline-none placeholder:text-muted-fg"
+          className="min-h-[140px] max-h-[240px] resize-none bg-transparent text-[13px] leading-relaxed text-text placeholder:text-muted-fg focus:!outline-none focus:!shadow-none focus-visible:!outline-none focus-visible:!shadow-none"
+          style={{ boxShadow: "none" }}
         />
       )}
 

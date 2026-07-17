@@ -18,18 +18,24 @@ export function InlineNote({ slug }: { slug: string }) {
 
   if (!hydrated || !note || !note.md.trim()) return null;
 
+  const dateStr = new Date(note.updatedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <div className="my-6 rounded-lg border border-emerald/25 bg-emerald/[0.05] p-4">
+    <div
+      onClick={openDrawer}
+      className="my-6 cursor-pointer rounded-lg border border-emerald/20 bg-emerald/[0.04] p-4 hover:bg-emerald/[0.07] transition-colors group"
+    >
       <div className="mb-2 flex items-center justify-between">
-        <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-emerald">
-          Your note · step {activeStep + 1}
-        </p>
-        <button
-          onClick={openDrawer}
-          className="font-mono text-[10px] text-muted-fg hover:text-text-2"
-        >
-          Edit
-        </button>
+        <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald">
+          <span aria-hidden>✎</span>
+          <span>your note · page {activeStep + 1}</span>
+        </div>
+        <span className="font-mono text-[10px] text-muted-fg group-hover:text-text-2 transition-colors">
+          {dateStr}
+        </span>
       </div>
       <div className="text-[13px] leading-relaxed text-text-2">
         {renderMarkdown(note.md)}

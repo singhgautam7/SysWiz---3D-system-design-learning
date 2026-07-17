@@ -44,6 +44,29 @@ export const useNotes = create<NotesState>()(
           };
         }),
     }),
-    { name: "sysviz.notes" },
+    {
+      name: "sysviz.notes",
+      version: 1,
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 0) {
+          const oldNotes = (persistedState as { notes?: Record<string, unknown> })?.notes || {};
+          const newNotes: Record<string, Record<number, Note>> = {};
+          for (const [slug, note] of Object.entries(oldNotes)) {
+            if (note && typeof note === "object" && "md" in note) {
+              newNotes[slug] = {
+                0: note as Note,
+              };
+            } else {
+              newNotes[slug] = note as Record<number, Note>;
+            }
+          }
+          return {
+            ...(persistedState as Record<string, unknown>),
+            notes: newNotes,
+          };
+        }
+        return persistedState as NotesState;
+      },
+    },
   ),
 );

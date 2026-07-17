@@ -25,15 +25,64 @@ export function renderMarkdown(md: string): ReactNode {
   };
 
   lines.forEach((line, i) => {
+    // 1. Bullet list items
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     if (bullet) {
       list.push(bullet[1] ?? "");
       return;
     }
     flushList(`ul-${i}`);
-    if (line.trim() === "") return;
+
+    // 2. Headers
+    const h1 = line.match(/^#\s+(.*)$/);
+    if (h1) {
+      blocks.push(
+        <h1 key={`h1-${i}`} className="mt-3.5 mb-1.5 text-[15px] font-bold text-text tracking-tight">
+          {renderInline(h1[1] ?? "")}
+        </h1>
+      );
+      return;
+    }
+
+    const h2 = line.match(/^##\s+(.*)$/);
+    if (h2) {
+      blocks.push(
+        <h2 key={`h2-${i}`} className="mt-3 mb-1 text-[13px] font-bold text-text tracking-tight">
+          {renderInline(h2[1] ?? "")}
+        </h2>
+      );
+      return;
+    }
+
+    const h3 = line.match(/^###\s+(.*)$/);
+    if (h3) {
+      blocks.push(
+        <h3 key={`h3-${i}`} className="mt-2.5 mb-1 text-[12px] font-bold text-text-2 tracking-tight">
+          {renderInline(h3[1] ?? "")}
+        </h3>
+      );
+      return;
+    }
+
+    // 3. Blockquotes
+    const bq = line.match(/^>\s+(.*)$/);
+    if (bq) {
+      blocks.push(
+        <blockquote key={`bq-${i}`} className="my-2 border-l-2 border-emerald/50 pl-3 italic text-muted-fg text-[12px]">
+          {renderInline(bq[1] ?? "")}
+        </blockquote>
+      );
+      return;
+    }
+
+    // 4. Blank line / Paragraph
+    if (line.trim() === "") {
+      blocks.push(<div key={`space-${i}`} className="h-2" />);
+      return;
+    }
+
     blocks.push(
-      <p key={`p-${i}`} className="my-1.5">
+      <p key={`p-${i}`} className="my-1.5 text-[13px] leading-relaxed text-text-2">
         {renderInline(line)}
       </p>,
     );
