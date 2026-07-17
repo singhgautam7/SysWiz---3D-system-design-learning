@@ -1,0 +1,62 @@
+---
+id: message-queue
+title: What Is a Message Queue?
+summary: A buffer that lets one part of a system hand work to another without waiting. Watch producers and a consumer in action.
+category: concept
+subcategory: messaging
+dimension: 2d
+componentRef: MessageQueueViz
+difficulty: beginner
+tags: [queue, async, decoupling, backpressure]
+estMinutes: 4
+related: [kafka, load-balancing]
+reviewStatus: needs-review
+authors: []
+updated: 2026-07-16
+---
+
+A **message queue** sits between a part of the system that produces work (**producers**) and
+a part that processes it (**consumers**). Instead of a producer calling a consumer directly
+and waiting, it drops a message into the queue and moves on. The consumer picks messages up
+when it's ready.
+
+<Step n={1} title="Decoupling">
+
+The producer and consumer no longer need to be available at the same moment, or run at the
+same speed. In the animation, try raising the producer rate above what the consumer can
+handle: the queue **grows**. Lower it, and the queue **drains**. The queue absorbs the
+difference — this buffering is the whole point.
+
+</Step>
+
+<Step n={2} title="Why this helps">
+
+- **Smoothing spikes:** a burst of traffic fills the queue instead of overwhelming the consumer.
+- **Resilience:** if the consumer briefly goes down, messages wait in the queue rather than being lost.
+- **Independent scaling:** add more consumers to drain the queue faster without touching producers.
+
+</Step>
+
+<Callout type="warn">
+A queue is a buffer, not infinite storage. If producers consistently outrun consumers, the
+queue grows without bound — that's **backpressure** building up. The fix is more/faster
+consumers, not a bigger queue. Watch this happen by holding a high producer rate in the
+animation.
+</Callout>
+
+<Compare
+  left="Without a queue (direct call)"
+  right="With a queue"
+  rows={[
+    ["Timing", "Producer waits for consumer", "Producer fires and forgets"],
+    ["Consumer down", "Request fails", "Message waits in queue"],
+    ["Traffic spike", "Consumer overwhelmed", "Queue absorbs the burst"],
+    ["Scaling consumers", "Coupled to producer", "Independent"],
+  ]}
+/>
+
+<KeyTakeaways>
+- A message queue decouples producers from consumers in time and speed.
+- It smooths spikes, survives brief consumer outages, and lets you scale consumers independently.
+- It's a buffer, not infinite storage — sustained overload shows up as an ever-growing queue (backpressure).
+</KeyTakeaways>

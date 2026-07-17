@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SysViz — Learn System Design by Watching It Move
 
-## Getting Started
+An interactive, visual learning platform for system design. Concepts and famous
+system-design questions are explained through **3D scenes** (for spatial ideas like
+scaling, replication, CDNs) and **animated 2D interactions** (for conceptual ideas
+like CAP theorem or database comparisons). The goal: let people *watch distributed
+systems operate*, tweak them, and build intuition faster than reading another article.
 
-First, run the development server:
+> **Status:** v1 — Interactive Visual Library. See [`docs/VISION.md`](docs/VISION.md)
+> for scope and explicit non-goals.
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js (App Router) + React 19 |
+| Language | TypeScript (**strict mode**) |
+| 3D | React Three Fiber + `@react-three/drei` (Three.js underneath) |
+| 2D / motion | Framer Motion (GSAP only where a scene needs heavy choreography) |
+| State | Zustand |
+| Styling / UI | Tailwind CSS + shadcn/ui |
+| Content | MDX (see [`docs/CONTENT_MODEL.md`](docs/CONTENT_MODEL.md)) |
+| Package manager / runtime | **Bun** |
+| Tests | Vitest (logic), Playwright (later, for flows) |
+| Hosting | Vercel |
+
+Simulation logic (phase 2+) lives in `src/lib/sim` as **framework-agnostic TypeScript**
+with zero React/Three imports, so it can be unit-tested and later extracted into its own
+package if needed.
+
+---
+
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`package.json` scripts use Bun as the runtime:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```jsonc
+{
+  "scripts": {
+    "dev":   "bun --bun next dev",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start",
+    "test":  "vitest",
+    "lint":  "next lint",
+    "typecheck": "tsc --noEmit"
+  }
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+To run on the Bun runtime on Vercel (optional, currently public beta), add to `vercel.json`:
 
-## Learn More
+```json
+{ "bunVersion": "1.x" }
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Documentation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Read these before writing code or content. Every contributor's AI assistant should
+be pointed at [`CLAUDE.md`](CLAUDE.md), which links out to the rest.
 
-## Deploy on Vercel
+- [`docs/VISION.md`](docs/VISION.md) — what we're building and, more importantly, what we're **not**.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stack, folder conventions, the simulation boundary.
+- [`docs/CONTENT_MODEL.md`](docs/CONTENT_MODEL.md) — the MDX schema (the most important doc for content authors).
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — coding + performance guidelines, Definition of Done, PR checklist, **content-review gate**.
+- [`docs/DESIGN_HANDOFF.md`](docs/DESIGN_HANDOFF.md) — the template every design handoff must follow.
+- [`specs/`](specs/) — one spec file per feature. Start with [`specs/000-vertical-slice.md`](specs/000-vertical-slice.md).
+- [`prompts/`](prompts/) — reusable design & code prompts for generating work with an LLM.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Repo layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+CLAUDE.md
+docs/
+specs/
+content/
+  concepts/          # "what is X" — message queues, DB types, caching…
+  system-designs/    # whatsapp, youtube, url shortener…
+prompts/
+src/
+  app/               # Next.js routes
+  components/        # shared UI (2D)
+  scenes/            # 3D scenes (React Three Fiber)
+  lib/
+    content/         # MDX loading + schema validation
+    sim/             # framework-agnostic simulation engine (phase 2+)
+```
+
+## License
+
+MIT (intended open source). See `LICENSE`.

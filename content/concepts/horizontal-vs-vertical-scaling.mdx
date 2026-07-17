@@ -1,0 +1,67 @@
+---
+id: horizontal-vs-vertical-scaling
+title: Horizontal vs Vertical Scaling
+summary: Two ways to handle more load — make one machine bigger, or add more machines. See the difference in 3D.
+category: concept
+subcategory: scaling
+dimension: 3d
+sceneRef: horizontal-vs-vertical-scaling
+difficulty: beginner
+tags: [scaling, capacity, load]
+estMinutes: 4
+related: [load-balancing, sharding]
+reviewStatus: needs-review
+authors: []
+updated: 2026-07-16
+---
+
+When traffic grows, a system needs more capacity. There are two fundamentally different ways
+to get it, and the choice shapes almost everything downstream.
+
+<Step n={1} title="Vertical scaling — scale up">
+
+Give the **same machine more power**: more CPU, more RAM, faster disks. In the scene, the
+single server box grows.
+
+It's the simplest option — no code changes, no coordination — which is why it's often the
+first move. But it has a ceiling: hardware only gets so big, bigger instances cost
+disproportionately more, and the machine is still a **single point of failure**. If it goes
+down, everything is down.
+
+</Step>
+
+<Step n={2} title="Horizontal scaling — scale out">
+
+Add **more machines** and spread the load across them. In the scene, one box becomes many
+identical boxes sitting behind a load balancer.
+
+There's practically no ceiling, and losing one machine no longer takes the system down. The
+cost is coordination: you now need a **load balancer** to distribute requests, and your
+application generally has to be **stateless** (or push state to a shared store) so any
+machine can handle any request.
+
+</Step>
+
+<Compare
+  left="Vertical (scale up)"
+  right="Horizontal (scale out)"
+  rows={[
+    ["Change", "Bigger machine", "More machines"],
+    ["Ceiling", "Hardware limit", "Practically none"],
+    ["Failure", "Single point of failure", "Survives node loss"],
+    ["Complexity", "Low", "Higher (LB + statelessness)"],
+    ["Typical first move", "Often yes", "When up hits limits"],
+  ]}
+/>
+
+<Callout type="tip">
+Real systems usually do **both**: scale a node up to a sensible size, then scale out with
+many of those nodes. The interesting engineering starts once you scale out — that's when
+load balancing, statelessness, and data partitioning come into play.
+</Callout>
+
+<KeyTakeaways>
+- Vertical scaling = one bigger machine; simple but capped and a single point of failure.
+- Horizontal scaling = more machines; near-unlimited and fault-tolerant, but needs a load balancer and stateless design.
+- Most production systems combine the two.
+</KeyTakeaways>
