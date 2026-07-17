@@ -1,0 +1,62 @@
+{
+  "version": "0.1",
+  "meta": {
+    "id": "horizontal-vs-vertical-scaling",
+    "title": "Horizontal Scaling — Request Flow"
+  },
+  "layout": { "type": "layered", "direction": "x", "spacing": 3 },
+  "camera": { "position": [10, 7, 14], "target": [2, 0, 0] },
+  "nodes": [
+    {
+      "id": "client",
+      "type": "client",
+      "label": "Clients",
+      "rank": 0,
+      "description": "Users sending requests to the system."
+    },
+    {
+      "id": "lb",
+      "type": "load-balancer",
+      "label": "Load Balancer",
+      "rank": 1,
+      "description": "Distributes incoming requests across the server fleet. Required once you scale out."
+    },
+    {
+      "id": "servers",
+      "type": "server",
+      "label": "App Servers",
+      "rank": 2,
+      "count": 3,
+      "description": "Stateless application servers. Scaling out means adding more of these; any one can handle any request."
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Database",
+      "rank": 3,
+      "description": "Shared source of truth. Keeping servers stateless pushes state here."
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": "client", "to": "lb", "flow": "request", "animated": true },
+    { "id": "e2", "from": "lb", "to": "servers", "flow": "request", "animated": true },
+    { "id": "e3", "from": "servers", "to": "db", "flow": "data", "animated": true }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "caption": "A request arrives and hits the load balancer.",
+      "highlight": { "nodes": ["client", "lb"], "edges": ["e1"] }
+    },
+    {
+      "id": "s2",
+      "caption": "The load balancer spreads requests across the server fleet — scaling out adds more servers here.",
+      "highlight": { "nodes": ["lb", "servers"], "edges": ["e2"] }
+    },
+    {
+      "id": "s3",
+      "caption": "Stateless servers read and write shared state in the database.",
+      "highlight": { "nodes": ["servers", "db"], "edges": ["e3"] }
+    }
+  ]
+}

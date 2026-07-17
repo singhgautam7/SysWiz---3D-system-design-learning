@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000000; --bg-1:#050506; --surface:#0A0B0D; --surface-2:#101215; --surface-3:#161A1F;
+    --border:#1B1F26; --border-2:#262B34; --border-3:#333947;
+    --text:#F2F4F7; --text-2:#B8BFCC; --muted:#6E7787;
+    --accent:#00E28A;      /* signature emerald */
+    --accent-2:#4CFFB2;
+    --accent-soft:rgba(0,226,138,.10);
+    --accent-glow:rgba(0,226,138,.35);
+    --req:#5B8CFF; --ok:#00E28A; --err:#FF5A6A; --warn:#FFB84D; --cache:#B48BFF; --retry:#FFB84D;
+    --r-sm:6px; --r:10px; --r-lg:14px; --r-xl:20px;
+    --shadow-lg:0 12px 40px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.03) inset;
+  }
+  html,body{margin:0;background:#000;color:var(--text);font-family:'Inter Tight',ui-sans-serif,system-ui,sans-serif;letter-spacing:-.005em;}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-feature-settings:"ss01","ss02";}
+  a{color:var(--accent-2);text-decoration:none}
+  a:hover{color:var(--accent)}
+  ::selection{background:var(--accent-soft);color:#fff}
+  /* GRID BG */
+  .grid-bg{background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:32px 32px;}
+  .dot-bg{background-image:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1px);background-size:18px 18px;}
+  /* MSG chip motion (2D queue) */
+  @keyframes msg-flow-in { 0%{transform:translateX(0)} 100%{transform:translateX(220px)} }
+  @keyframes msg-flow-out { 0%{transform:translateX(0);opacity:1} 90%{opacity:1} 100%{transform:translateX(180px);opacity:0} }
+  @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 var(--accent-glow)} 70%{box-shadow:0 0 0 14px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+  @keyframes float-y { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes shimmer { 0%{background-position:-500px 0} 100%{background-position:500px 0} }
+  @keyframes glow-sweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  @keyframes queue-fill { 0%,100%{height:38%} 50%{height:78%} }
+  @keyframes tilt-rot { 0%,100%{transform:rotateX(58deg) rotateZ(-42deg)} 50%{transform:rotateX(58deg) rotateZ(-48deg)} }
+  @keyframes rack-light { 0%,100%{opacity:.4} 50%{opacity:1} }
+  @keyframes bar-rise { 0%{height:20%} 100%{height:var(--h,60%)} }
+  .msg{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;background:var(--surface-3);border:1px solid var(--border-3);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);}
+  .msg .dot{width:6px;height:6px;border-radius:50%;background:var(--req)}
+  .msg.ok .dot{background:var(--ok)}
+  .msg.err .dot{background:var(--err)}
+  .msg.wait{border-style:dashed;color:var(--text-2)}
+  .shimmer{background:linear-gradient(90deg,var(--surface-2) 0%,var(--surface-3) 50%,var(--surface-2) 100%);background-size:1000px 100%;animation:shimmer 1.6s linear infinite}
+  .spin{animation:spin 1s linear infinite}
+  .rm *{animation:none !important;transition:none !important}
+  /* 3D scene */
+  .scene3d{perspective:1400px;perspective-origin:50% 30%;}
+  .stage{transform-style:preserve-3d;transform:rotateX(58deg) rotateZ(-42deg);animation:tilt-rot 12s ease-in-out infinite;transform-origin:center center;}
+  .rack{transform-style:preserve-3d;position:absolute;}
+  .face{position:absolute;box-sizing:border-box;}
+  .face.top{background:linear-gradient(135deg,#161A22,#0D0F14);border:1px solid #2B3140;}
+  .face.side{background:linear-gradient(180deg,#0F1218,#05070A);border:1px solid #262B36;}
+  .face.front{background:linear-gradient(180deg,#141821,#0A0C10);border:1px solid #262B36;}
+  .led{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent-glow);animation:rack-light 1.4s ease-in-out infinite;}
+  .led.b{background:var(--req);box-shadow:0 0 6px rgba(91,140,255,.6);animation-delay:.4s}
+  .led.c{background:var(--warn);box-shadow:0 0 6px rgba(255,184,77,.6);animation-delay:.8s}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#000;padding:44px 32px 120px;">
+
+  <!-- header -->
+  <div style="max-width:1440px;margin:0 auto 40px;display:flex;align-items:center;gap:16px;">
+    <div style="width:40px;height:40px;border-radius:11px;background:radial-gradient(circle at 30% 30%,#4CFFB2,#00A85F 70%);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,226,138,.4),inset 0 1px 0 rgba(255,255,255,.3);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8 12 4 20 8 12 12z" stroke="#001910" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="#001910" stroke-width="1.6" stroke-linejoin="round" opacity=".55"/></svg>
+    </div>
+    <div>
+      <div style="font-size:22px;font-weight:600;letter-spacing:-.02em;">SysViz <span style="color:var(--muted);font-weight:400;">— v1 design</span></div>
+      <div class="mono" style="color:var(--muted);font-size:12px;margin-top:2px;">Watch systems move · AMOLED · emerald · 3D-first</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <a href="#1a" class="mono" style="padding:6px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:11px;color:var(--text-2);">01 Library</a>
+      <a href="#2a" class="mono" style="padding:6px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:11px;color:var(--text-2);">02 3D Lesson</a>
+      <a href="#3a" class="mono" style="padding:6px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:11px;color:var(--text-2);">03 2D Lesson</a>
+      <a href="#4a" class="mono" style="padding:6px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:11px;color:var(--text-2);">04 System</a>
+    </div>
+  </div>
+
+  <!-- =============================== SECTION 1: LIBRARY =============================== -->
+  <section id="1a" style="max-width:1440px;margin:0 auto 80px;">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;">
+      <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(0,226,138,.3);border-radius:5px;">1a</span>
+      <div class="mono" style="color:var(--muted);font-size:12px;letter-spacing:.08em;">HOME / LIBRARY · GRID + LIST · 3 BREAKPOINTS · STATES</div>
+      <div style="height:1px;flex:1;background:linear-gradient(90deg,var(--border-2),transparent);"></div>
+    </div>
+
+    <div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap;">
+
+      <!-- DESKTOP 1280 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">DESKTOP · 1280 · grid view</div>
+        <div style="width:1280px;height:860px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;">
+
+          <!-- topbar -->
+          <div style="display:flex;align-items:center;padding:14px 24px;border-bottom:1px solid var(--border);gap:20px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:26px;height:26px;border-radius:7px;background:radial-gradient(circle at 30% 30%,#4CFFB2,#00A85F 70%);"></div>
+              <div style="font-weight:600;font-size:15px;">SysViz</div>
+              <span class="mono" style="font-size:10px;padding:1px 6px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border);border-radius:4px;">v1.0</span>
+            </div>
+            <nav style="display:flex;gap:2px;margin-left:16px;">
+              <a href="#" style="padding:6px 10px;font-size:13px;color:var(--text);background:var(--surface-2);border-radius:7px;">Library</a>
+              <a href="#" style="padding:6px 10px;font-size:13px;color:var(--muted);">My progress</a>
+              <a href="#" style="padding:6px 10px;font-size:13px;color:var(--muted);">Favorites <span class="mono" style="color:var(--accent);margin-left:2px;">3</span></a>
+            </nav>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--border-2);border-radius:8px;color:var(--text-2);font-size:13px;width:260px;background:var(--surface);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <span style="color:var(--muted);">Search lessons, concepts…</span>
+                <span class="mono" style="margin-left:auto;color:var(--muted);font-size:10px;padding:1px 5px;border:1px solid var(--border-2);border-radius:4px;">⌘K</span>
+              </div>
+              <button style="padding:7px 10px;border:1px solid var(--border-2);background:var(--surface);border-radius:8px;color:var(--text-2);font-size:12px;">☾</button>
+            </div>
+          </div>
+
+          <!-- hero row -->
+          <div style="padding:28px 24px 16px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;">
+            <div>
+              <div style="font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1;">Library</div>
+              <div style="color:var(--text-2);font-size:14px;margin-top:8px;max-width:560px;line-height:1.5;">Short, interactive lessons. Spatial systems as <span style="color:var(--accent);">3D scenes</span> you can orbit. Comparisons and flows as animated 2D. No accounts, no autoplay.</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <!-- filter pills -->
+              <div style="display:flex;gap:4px;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+                <div style="padding:6px 12px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:7px;font-size:12px;">All <span class="mono" style="color:var(--muted);margin-left:3px;">14</span></div>
+                <div style="padding:6px 12px;font-size:12px;color:var(--text-2);">Concepts <span class="mono" style="color:var(--muted);margin-left:3px;">8</span></div>
+                <div style="padding:6px 12px;font-size:12px;color:var(--text-2);">System Designs <span class="mono" style="color:var(--muted);margin-left:3px;">6</span></div>
+              </div>
+              <!-- view toggle -->
+              <div style="display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+                <button title="Grid" style="width:32px;height:32px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:7px;color:var(--text);display:flex;align-items:center;justify-content:center;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
+                <button title="List" style="width:32px;height:32px;background:transparent;border:0;color:var(--muted);display:flex;align-items:center;justify-content:center;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- content -->
+          <div style="padding:12px 24px 24px;overflow-y:auto;">
+            <!-- filter row -->
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+              <span class="mono" style="font-size:10px;color:var(--muted);">FILTER</span>
+              <button class="mono" style="padding:4px 8px;background:var(--surface);border:1px solid var(--border-2);border-radius:6px;font-size:11px;color:var(--text-2);">Beginner ×</button>
+              <button class="mono" style="padding:4px 8px;background:var(--surface);border:1px solid var(--border-2);border-radius:6px;font-size:11px;color:var(--text-2);">3D only ×</button>
+              <button class="mono" style="padding:4px 8px;background:transparent;border:1px dashed var(--border-2);border-radius:6px;font-size:11px;color:var(--muted);">+ difficulty</button>
+              <button class="mono" style="padding:4px 8px;background:transparent;border:1px dashed var(--border-2);border-radius:6px;font-size:11px;color:var(--muted);">+ topic</button>
+              <span style="margin-left:auto;color:var(--muted);font-size:12px;" class="mono">14 lessons · sort: <span style="color:var(--text-2);">newest</span></span>
+            </div>
+
+            <!-- CONCEPTS group -->
+            <div style="display:flex;align-items:center;gap:10px;margin:4px 0 14px;">
+              <div class="mono" style="letter-spacing:.1em;font-size:11px;color:var(--muted);">CONCEPTS</div>
+              <div style="flex:1;height:1px;background:var(--border);"></div>
+              <div class="mono" style="font-size:10px;color:var(--muted);">8 lessons</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+              <!-- featured card: 3D scaling -->
+              <div style="background:var(--surface);border:1px solid var(--border-3);border-radius:14px;padding:14px;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.5;"></div>
+                <div style="height:150px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;overflow:hidden;" class="grid-bg scene3d">
+                  <div class="stage" style="position:absolute;left:50%;top:52%;width:200px;height:120px;margin-left:-100px;margin-top:-60px;">
+                    <div class="rack" style="width:34px;height:56px;left:20px;top:20px;">
+                      <div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div>
+                      <div class="face front" style="width:34px;height:56px;">
+                        <div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div>
+                        <div style="position:absolute;top:18px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:24px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:30px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:36px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                      </div>
+                    </div>
+                    <div class="rack" style="width:34px;height:56px;left:70px;top:20px;">
+                      <div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div>
+                      <div class="face front" style="width:34px;height:56px;">
+                        <div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led c"></span></div>
+                        <div style="position:absolute;top:18px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:24px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:30px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                      </div>
+                    </div>
+                    <div class="rack" style="width:34px;height:56px;left:120px;top:20px;">
+                      <div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div>
+                      <div class="face front" style="width:34px;height:56px;">
+                        <div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div>
+                        <div style="position:absolute;top:18px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                        <div style="position:absolute;top:24px;left:5px;right:5px;height:2px;background:#252A34;"></div>
+                      </div>
+                    </div>
+                    <div class="rack" style="width:34px;height:56px;left:170px;top:20px;">
+                      <div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div>
+                      <div class="face front" style="width:34px;height:56px;">
+                        <div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="position:absolute;top:8px;left:10px;display:flex;gap:5px;">
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.35);">3D · INTERACTIVE</span>
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:var(--surface-2);color:var(--text-2);border-radius:4px;border:1px solid var(--border-2);">Beginner</span>
+                  </div>
+                  <button title="Favorite" style="position:absolute;top:8px;right:8px;width:28px;height:28px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);border:1px solid var(--border-2);border-radius:7px;color:var(--accent);display:flex;align-items:center;justify-content:center;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg>
+                  </button>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;letter-spacing:-.01em;">Horizontal vs Vertical Scaling</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">Add more machines, or make one bigger? Orbit both racks; watch throughput and p99 diverge.</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                  <div style="display:flex;gap:8px;align-items:center;" class="mono">
+                    <span style="font-size:11px;color:var(--muted);">3 pages</span>
+                    <span style="color:var(--border-3);">·</span>
+                    <span style="font-size:11px;color:var(--muted);">04:20</span>
+                    <span style="color:var(--border-3);">·</span>
+                    <span style="font-size:11px;color:var(--accent);">42%</span>
+                  </div>
+                  <div style="color:var(--accent);font-size:12px;font-weight:500;">Resume →</div>
+                </div>
+                <div style="position:absolute;bottom:0;left:0;height:2px;width:42%;background:var(--accent);"></div>
+              </div>
+
+              <!-- 2D message queue -->
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;position:relative;">
+                <div style="height:150px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;overflow:hidden;padding:14px;display:flex;align-items:center;gap:8px;" class="dot-bg">
+                  <div style="width:26px;height:26px;background:var(--surface-2);border:1px solid var(--req);border-radius:6px;flex-shrink:0;position:relative;"><div style="position:absolute;top:3px;left:3px;width:4px;height:4px;background:var(--req);border-radius:50%;"></div></div>
+                  <span class="msg" style="font-size:9px;padding:3px 6px;"><span class="dot"></span>MSG 42</span>
+                  <span class="msg" style="font-size:9px;padding:3px 6px;"><span class="dot"></span>MSG 43</span>
+                  <div style="flex-shrink:0;width:40px;height:60px;background:var(--surface-2);border:1px solid var(--accent);border-radius:6px;position:relative;display:flex;flex-direction:column-reverse;padding:3px;gap:2px;overflow:hidden;">
+                    <div style="height:8px;background:var(--accent);border-radius:2px;opacity:.9;"></div>
+                    <div style="height:8px;background:var(--accent);border-radius:2px;opacity:.7;"></div>
+                    <div style="height:8px;background:var(--accent);border-radius:2px;opacity:.5;"></div>
+                  </div>
+                  <span class="msg ok" style="font-size:9px;padding:3px 6px;"><span class="dot"></span>MSG 40</span>
+                  <div style="width:26px;height:26px;background:var(--surface-2);border:1px solid var(--ok);border-radius:6px;flex-shrink:0;"></div>
+                  <div style="position:absolute;top:8px;left:10px;display:flex;gap:5px;">
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;border:1px solid rgba(180,139,255,.3);">2D · ANIMATED</span>
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:var(--surface-2);color:var(--text-2);border-radius:4px;border:1px solid var(--border-2);">Beginner</span>
+                  </div>
+                  <button style="position:absolute;top:8px;right:8px;width:28px;height:28px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);border:1px solid var(--border-2);border-radius:7px;color:var(--muted);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;">What Is a Message Queue?</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">Producers, buffer, consumers — watch <span class="mono" style="font-size:12px;">MSG</span> chips travel end-to-end.</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                  <div class="mono" style="font-size:11px;color:var(--muted);">5 pages · 07:30 · not started</div>
+                  <div style="color:var(--text-2);font-size:12px;">Start →</div>
+                </div>
+              </div>
+
+              <!-- Caching -->
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;position:relative;">
+                <div style="height:150px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:14px;" class="dot-bg">
+                  <div style="width:32px;height:32px;border:1.5px solid var(--req);border-radius:50%;position:relative;"><div style="position:absolute;inset:6px;border-radius:50%;background:var(--surface-2);"></div></div>
+                  <svg width="24" height="14"><path d="M0 7h20M14 2l6 5-6 5" stroke="var(--req)" stroke-width="1.5" fill="none"/></svg>
+                  <div style="padding:8px 12px;background:var(--surface-2);border:1.5px solid var(--cache);border-radius:8px;position:relative;">
+                    <div class="mono" style="font-size:10px;color:#D0B8FF;">CACHE</div>
+                    <div style="position:absolute;top:-6px;right:-6px;padding:1px 5px;background:var(--ok);color:#001910;font-size:9px;border-radius:4px;font-family:JetBrains Mono,monospace;font-weight:600;">HIT</div>
+                  </div>
+                  <svg width="24" height="14"><path d="M0 7h20" stroke="var(--border-3)" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/></svg>
+                  <div style="padding:8px 10px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:6px;opacity:.5;"><div class="mono" style="font-size:10px;color:var(--muted);">DB</div></div>
+                  <div style="position:absolute;top:8px;left:10px;display:flex;gap:5px;">
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;border:1px solid rgba(180,139,255,.3);">2D</span>
+                    <span class="mono" style="font-size:10px;padding:2px 6px;background:rgba(255,184,77,.12);color:var(--warn);border-radius:4px;border:1px solid rgba(255,184,77,.3);">Intermediate</span>
+                  </div>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;">Caching: Hits, Misses, Evictions</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">How caches decide what to keep. Requests turn <span style="color:var(--ok);">green</span> on hit, <span style="color:var(--warn);">amber</span> on miss.</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                  <div class="mono" style="font-size:11px;color:var(--muted);">4 pages · 05:10</div>
+                  <div style="color:var(--text-2);font-size:12px;">Start →</div>
+                </div>
+              </div>
+
+              <!-- CDN 3D -->
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:150px;border-radius:10px;background:radial-gradient(400px 200px at 50% 60%,#0A1520,#020306);border:1px solid var(--border-2);position:relative;overflow:hidden;">
+                  <svg viewBox="0 0 260 150" style="position:absolute;inset:0;width:100%;height:100%;">
+                    <ellipse cx="130" cy="90" rx="100" ry="30" fill="none" stroke="#1F2632" stroke-width="1"/>
+                    <ellipse cx="130" cy="90" rx="80" ry="22" fill="none" stroke="#1F2632" stroke-width="1"/>
+                    <circle cx="60" cy="82" r="4" fill="#00E28A"/>
+                    <circle cx="130" cy="70" r="5" fill="#00E28A"/>
+                    <circle cx="200" cy="82" r="4" fill="#00E28A"/>
+                    <circle cx="90" cy="105" r="3" fill="#5B8CFF"/>
+                    <circle cx="170" cy="105" r="3" fill="#5B8CFF"/>
+                    <path d="M60 82 Q95 60 130 70 T200 82" stroke="#00E28A" stroke-width="1" fill="none" opacity=".6" stroke-dasharray="2 3"/>
+                  </svg>
+                  <span class="mono" style="position:absolute;top:8px;left:10px;font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.35);">3D · INTERACTIVE</span>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;">CDN Edge Delivery</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">Watch a request find its closest edge across a spinning globe.</div>
+                <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);" class="mono"><span style="font-size:11px;color:var(--muted);">3 pages · 06:00</span><span style="font-size:12px;color:var(--text-2);">Start →</span></div>
+              </div>
+
+              <!-- Replication -->
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:150px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:20px;" class="grid-bg">
+                  <div style="width:40px;height:52px;background:var(--surface-2);border:1.5px solid var(--accent);border-radius:6px;position:relative;"><div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;color:var(--accent);" class="mono">PRIMARY</div><div style="position:absolute;top:4px;left:4px;width:5px;height:5px;background:var(--accent);border-radius:50%;box-shadow:0 0 6px var(--accent-glow);"></div></div>
+                  <svg width="30" height="60"><path d="M0 30 L28 30" stroke="var(--accent)" stroke-width="1"/><path d="M0 15 L28 5" stroke="var(--border-3)" stroke-width="1" stroke-dasharray="3 2"/><path d="M0 45 L28 55" stroke="var(--border-3)" stroke-width="1" stroke-dasharray="3 2"/></svg>
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <div style="width:36px;height:22px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:4px;"></div>
+                    <div style="width:36px;height:22px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:4px;"></div>
+                  </div>
+                  <span class="mono" style="position:absolute;top:8px;left:10px;font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.35);">3D</span>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;">Replication &amp; Consistency</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">Primary, replicas, and the lag between them.</div>
+                <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);" class="mono"><span style="font-size:11px;color:var(--muted);">4 pages · 08:15</span><span style="font-size:12px;color:var(--text-2);">Start →</span></div>
+              </div>
+
+              <!-- Sharding placeholder -->
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:150px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:20px;" class="grid-bg">
+                  <div style="background:var(--surface-2);border:1px solid var(--accent);border-radius:4px;"></div>
+                  <div style="background:var(--surface-2);border:1px solid #B48BFF;border-radius:4px;"></div>
+                  <div style="background:var(--surface-2);border:1px solid var(--req);border-radius:4px;"></div>
+                  <span class="mono" style="position:absolute;top:8px;left:10px;font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;border:1px solid rgba(180,139,255,.3);">2D</span>
+                </div>
+                <div style="font-size:15px;font-weight:600;margin-top:12px;">Database Sharding</div>
+                <div style="color:var(--text-2);font-size:13px;margin-top:4px;line-height:1.45;">Range, hash, and geo — see keys land in shards.</div>
+                <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);" class="mono"><span style="font-size:11px;color:var(--muted);">6 pages · 12:00</span><span style="font-size:12px;color:var(--text-2);">Start →</span></div>
+              </div>
+            </div>
+
+            <!-- SYSTEM DESIGNS -->
+            <div style="display:flex;align-items:center;gap:10px;margin:28px 0 14px;">
+              <div class="mono" style="letter-spacing:.1em;font-size:11px;color:var(--muted);">SYSTEM DESIGNS</div>
+              <div style="flex:1;height:1px;background:var(--border);"></div>
+              <div class="mono" style="font-size:10px;color:var(--muted);">6 walkthroughs</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:110px;border-radius:10px;background:#040507;border:1px solid var(--border-2);" class="grid-bg"></div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Design a URL Shortener</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">API → hash → redirect. Step every hop.</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:110px;border-radius:10px;background:#040507;border:1px solid var(--border-2);" class="grid-bg"></div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Design a Rate Limiter</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">Token vs leaky bucket under bursts.</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:14px;">
+                <div style="height:110px;border-radius:10px;background:#040507;border:1px solid var(--border-2);" class="grid-bg"></div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Design a News Feed</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">Fan-out on write vs read.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop 1280 LIST VIEW -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">DESKTOP · 1280 · list view</div>
+        <div style="width:1280px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;">
+          <div style="padding:20px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
+            <div style="font-size:20px;font-weight:600;">Library — list</div>
+            <div style="display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+              <button style="width:32px;height:32px;background:transparent;border:0;color:var(--muted);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+              <button style="width:32px;height:32px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:7px;color:var(--text);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></button>
+            </div>
+          </div>
+          <!-- table header -->
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:12px 24px;border-bottom:1px solid var(--border);" class="mono">
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">TYPE</div>
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">TITLE</div>
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">DIFFICULTY</div>
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">PAGES</div>
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">DURATION</div>
+            <div style="color:var(--muted);font-size:10px;letter-spacing:.08em;">PROGRESS</div>
+            <div></div>
+          </div>
+          <!-- rows -->
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:14px 24px;border-bottom:1px solid var(--border);align-items:center;background:linear-gradient(90deg,var(--accent-soft),transparent 30%);">
+            <div style="width:44px;height:32px;border-radius:6px;background:var(--surface-2);border:1px solid rgba(0,226,138,.4);display:flex;align-items:center;justify-content:center;" class="mono"><span style="color:var(--accent);font-size:10px;font-weight:600;">3D</span></div>
+            <div><div style="font-size:14px;font-weight:500;">Horizontal vs Vertical Scaling</div><div style="color:var(--muted);font-size:12px;margin-top:2px;">Scaling · Concepts</div></div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">Beginner</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">3</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">04:20</div>
+            <div><div style="height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;"><div style="height:100%;width:42%;background:var(--accent);"></div></div><div class="mono" style="font-size:10px;color:var(--accent);margin-top:3px;">42%</div></div>
+            <div style="display:flex;gap:4px;justify-content:flex-end;"><button style="width:28px;height:28px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:7px;color:var(--accent);"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button></div>
+          </div>
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:14px 24px;border-bottom:1px solid var(--border);align-items:center;">
+            <div style="width:44px;height:32px;border-radius:6px;background:var(--surface-2);border:1px solid rgba(180,139,255,.4);display:flex;align-items:center;justify-content:center;" class="mono"><span style="color:#D0B8FF;font-size:10px;font-weight:600;">2D</span></div>
+            <div><div style="font-size:14px;font-weight:500;">What Is a Message Queue?</div><div style="color:var(--muted);font-size:12px;margin-top:2px;">Messaging · Concepts</div></div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">Beginner</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">5</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">07:30</div>
+            <div class="mono" style="font-size:11px;color:var(--muted);">— not started</div>
+            <div style="display:flex;gap:4px;justify-content:flex-end;"><button style="width:28px;height:28px;background:transparent;border:1px solid var(--border-2);border-radius:7px;color:var(--muted);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button></div>
+          </div>
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:14px 24px;border-bottom:1px solid var(--border);align-items:center;">
+            <div style="width:44px;height:32px;border-radius:6px;background:var(--surface-2);border:1px solid rgba(180,139,255,.4);display:flex;align-items:center;justify-content:center;" class="mono"><span style="color:#D0B8FF;font-size:10px;font-weight:600;">2D</span></div>
+            <div><div style="font-size:14px;font-weight:500;">Caching: Hits, Misses, Evictions</div><div style="color:var(--muted);font-size:12px;margin-top:2px;">Performance · Concepts</div></div>
+            <div class="mono" style="font-size:11px;color:var(--warn);">Intermediate</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">4</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">05:10</div>
+            <div><div style="height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;"><div style="height:100%;width:100%;background:var(--muted);"></div></div><div class="mono" style="font-size:10px;color:var(--muted);margin-top:3px;">complete</div></div>
+            <div style="display:flex;gap:4px;justify-content:flex-end;"><button style="width:28px;height:28px;background:transparent;border:1px solid var(--border-2);border-radius:7px;color:var(--muted);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button></div>
+          </div>
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:14px 24px;border-bottom:1px solid var(--border);align-items:center;">
+            <div style="width:44px;height:32px;border-radius:6px;background:var(--surface-2);border:1px solid rgba(0,226,138,.4);display:flex;align-items:center;justify-content:center;" class="mono"><span style="color:var(--accent);font-size:10px;font-weight:600;">3D</span></div>
+            <div><div style="font-size:14px;font-weight:500;">CDN Edge Delivery</div><div style="color:var(--muted);font-size:12px;margin-top:2px;">Networking · Concepts</div></div>
+            <div class="mono" style="font-size:11px;color:var(--warn);">Intermediate</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">3</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">06:00</div>
+            <div class="mono" style="font-size:11px;color:var(--muted);">—</div>
+            <div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:60px 1.6fr 90px 90px 100px 100px 60px;gap:16px;padding:14px 24px;align-items:center;">
+            <div style="width:44px;height:32px;border-radius:6px;background:var(--surface-2);border:1px solid rgba(0,226,138,.4);display:flex;align-items:center;justify-content:center;" class="mono"><span style="color:var(--accent);font-size:10px;font-weight:600;">3D</span></div>
+            <div><div style="font-size:14px;font-weight:500;">Replication &amp; Consistency</div><div style="color:var(--muted);font-size:12px;margin-top:2px;">Databases · Concepts</div></div>
+            <div class="mono" style="font-size:11px;color:#FF5A6A;">Advanced</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">4</div>
+            <div class="mono" style="font-size:11px;color:var(--text-2);">08:15</div>
+            <div class="mono" style="font-size:11px;color:var(--muted);">—</div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLET 768 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">TABLET · 768</div>
+        <div style="width:768px;height:860px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;">
+          <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);gap:14px;">
+            <div style="width:24px;height:24px;border-radius:7px;background:radial-gradient(circle at 30% 30%,#4CFFB2,#00A85F 70%);"></div>
+            <div style="font-weight:600;font-size:14px;">SysViz</div>
+            <div style="margin-left:auto;display:flex;gap:6px;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">
+              <div style="padding:6px 12px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:6px;font-size:12px;">All</div>
+              <div style="padding:6px 12px;font-size:12px;color:var(--muted);">Concepts</div>
+              <div style="padding:6px 12px;font-size:12px;color:var(--muted);">Systems</div>
+            </div>
+          </div>
+          <div style="padding:22px 18px 14px;display:flex;justify-content:space-between;align-items:flex-end;">
+            <div>
+              <div style="font-size:26px;font-weight:600;letter-spacing:-.02em;">Library</div>
+              <div style="color:var(--text-2);font-size:13px;margin-top:4px;">Watch systems move.</div>
+            </div>
+            <div style="display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">
+              <button style="width:30px;height:30px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:6px;color:var(--text);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+              <button style="width:30px;height:30px;background:transparent;border:0;color:var(--muted);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></button>
+            </div>
+          </div>
+          <div style="padding:6px 18px 18px;">
+            <div class="mono" style="color:var(--muted);font-size:10px;letter-spacing:.1em;margin:6px 0 10px;">CONCEPTS</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+              <div style="background:var(--surface);border:1px solid var(--border-3);border-radius:12px;padding:12px;">
+                <div style="height:110px;border-radius:9px;background:#040507;border:1px solid var(--border-2);position:relative;" class="grid-bg">
+                  <span class="mono" style="position:absolute;top:8px;left:8px;font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.35);">3D · Beginner</span>
+                  <button style="position:absolute;top:8px;right:8px;width:26px;height:26px;background:rgba(0,0,0,.6);border:1px solid var(--border-2);border-radius:6px;color:var(--accent);"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+                </div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Horizontal vs Vertical Scaling</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">Add more machines, or one bigger?</div>
+                <div class="mono" style="font-size:10px;color:var(--muted);margin-top:8px;">3 pages · 04:20 · <span style="color:var(--accent);">42%</span></div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px;">
+                <div style="height:110px;border-radius:9px;background:#040507;border:1px solid var(--border-2);position:relative;" class="dot-bg">
+                  <span class="mono" style="position:absolute;top:8px;left:8px;font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;border:1px solid rgba(180,139,255,.3);">2D · Beginner</span>
+                </div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">What Is a Message Queue?</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">Producers, buffer, consumers.</div>
+                <div class="mono" style="font-size:10px;color:var(--muted);margin-top:8px;">5 pages · 07:30</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px;">
+                <div style="height:110px;border-radius:9px;background:#040507;border:1px solid var(--border-2);position:relative;" class="dot-bg">
+                  <span class="mono" style="position:absolute;top:8px;left:8px;font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;">2D · Intermediate</span>
+                </div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Caching: Hits &amp; Misses</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">What a cache keeps.</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px;">
+                <div style="height:110px;border-radius:9px;background:#040507;border:1px solid var(--border-2);position:relative;" class="grid-bg">
+                  <span class="mono" style="position:absolute;top:8px;left:8px;font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;">3D · Intermediate</span>
+                </div>
+                <div style="font-size:14px;font-weight:600;margin-top:10px;">Replication</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px;">Primary, replicas, lag.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE 375 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">MOBILE · 375</div>
+        <div style="width:375px;height:812px;background:var(--bg);border:1px solid var(--border);border-radius:36px;box-shadow:var(--shadow-lg);overflow:hidden;position:relative;">
+          <div style="display:flex;justify-content:space-between;padding:14px 24px 4px;font-size:12px;color:var(--text);" class="mono"><span>9:41</span><span>●●● ▮</span></div>
+          <div style="display:flex;align-items:center;padding:8px 16px 12px;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:8px;background:radial-gradient(circle at 30% 30%,#4CFFB2,#00A85F 70%);"></div>
+            <div style="font-weight:600;font-size:16px;">SysViz</div>
+            <button style="margin-left:auto;width:38px;height:38px;border-radius:10px;background:var(--surface);border:1px solid var(--border-2);color:var(--text-2);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </button>
+          </div>
+          <div style="padding:6px 16px 12px;">
+            <div style="font-size:28px;font-weight:600;letter-spacing:-.03em;">Library</div>
+            <div style="color:var(--text-2);font-size:13px;margin-top:2px;">Watch systems move.</div>
+          </div>
+          <div style="padding:0 16px;">
+            <div style="display:flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--border-2);border-radius:11px;">
+              <div style="flex:1;text-align:center;padding:9px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:8px;font-size:13px;">All</div>
+              <div style="flex:1;text-align:center;padding:9px;font-size:13px;color:var(--muted);">Concepts</div>
+              <div style="flex:1;text-align:center;padding:9px;font-size:13px;color:var(--muted);">Systems</div>
+            </div>
+          </div>
+          <!-- resume banner -->
+          <div style="margin:14px 16px 4px;background:linear-gradient(135deg,rgba(0,226,138,.15),rgba(0,226,138,.03));border:1px solid rgba(0,226,138,.35);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;">
+            <div style="width:38px;height:38px;border-radius:9px;background:radial-gradient(circle at 30% 30%,#4CFFB2,#00A85F 80%);display:flex;align-items:center;justify-content:center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#001910"><path d="M7 5v14l12-7z"/></svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div class="mono" style="font-size:10px;color:var(--accent);">CONTINUE</div>
+              <div style="font-size:13px;font-weight:500;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Horizontal vs Vertical Scaling</div>
+              <div style="height:3px;background:rgba(0,226,138,.15);border-radius:2px;margin-top:6px;overflow:hidden;"><div style="width:42%;height:100%;background:var(--accent);"></div></div>
+            </div>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:400px;">
+            <div class="mono" style="color:var(--muted);font-size:10px;letter-spacing:.1em;">CONCEPTS</div>
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:12px;">
+              <div style="height:110px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;" class="grid-bg">
+                <div style="position:absolute;top:8px;left:8px;display:flex;gap:4px;">
+                  <span class="mono" style="font-size:10px;padding:2px 6px;background:var(--accent-soft);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.35);">3D</span>
+                  <span class="mono" style="font-size:10px;padding:2px 6px;background:var(--surface-2);color:var(--text-2);border-radius:4px;">Beginner</span>
+                </div>
+                <button style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(0,0,0,.6);border:1px solid var(--border-2);border-radius:8px;color:var(--accent);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+              </div>
+              <div style="font-size:15px;font-weight:600;margin-top:10px;">Horizontal vs Vertical Scaling</div>
+              <div style="color:var(--text-2);font-size:13px;margin-top:2px;line-height:1.4;">Add more machines, or make one bigger?</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:8px;">3 pages · 04:20</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:12px;">
+              <div style="height:110px;border-radius:10px;background:#040507;border:1px solid var(--border-2);position:relative;" class="dot-bg">
+                <span class="mono" style="position:absolute;top:8px;left:8px;font-size:10px;padding:2px 6px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:4px;border:1px solid rgba(180,139,255,.3);">2D · Beginner</span>
+              </div>
+              <div style="font-size:15px;font-weight:600;margin-top:10px;">What Is a Message Queue?</div>
+              <div style="color:var(--text-2);font-size:13px;margin-top:2px;line-height:1.4;">Producers, a buffer, consumers.</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:8px;">5 pages · 07:30</div>
+            </div>
+          </div>
+          <!-- bottom nav -->
+          <div style="position:absolute;bottom:14px;left:14px;right:14px;background:rgba(10,11,13,.9);backdrop-filter:blur(24px);border:1px solid var(--border-2);border-radius:16px;display:flex;padding:6px;">
+            <div style="flex:1;padding:10px;text-align:center;font-size:11px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:10px;color:var(--text);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:0 auto 3px;"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Library
+            </div>
+            <div style="flex:1;padding:10px;text-align:center;font-size:11px;color:var(--muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:0 auto 3px;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg>Favorites
+            </div>
+            <div style="flex:1;padding:10px;text-align:center;font-size:11px;color:var(--muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:0 auto 3px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Progress
+            </div>
+            <div style="flex:1;padding:10px;text-align:center;font-size:11px;color:var(--muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:0 auto 3px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- States row -->
+    <div style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">STATE · LOADING (skeleton)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+          <div><div class="shimmer" style="height:130px;border-radius:10px;"></div><div class="shimmer" style="height:14px;width:70%;border-radius:4px;margin-top:12px;"></div><div class="shimmer" style="height:10px;width:90%;border-radius:4px;margin-top:8px;"></div></div>
+          <div><div class="shimmer" style="height:130px;border-radius:10px;"></div><div class="shimmer" style="height:14px;width:70%;border-radius:4px;margin-top:12px;"></div><div class="shimmer" style="height:10px;width:90%;border-radius:4px;margin-top:8px;"></div></div>
+          <div><div class="shimmer" style="height:130px;border-radius:10px;"></div><div class="shimmer" style="height:14px;width:70%;border-radius:4px;margin-top:12px;"></div><div class="shimmer" style="height:10px;width:90%;border-radius:4px;margin-top:8px;"></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">STATE · EMPTY (filtered)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:32px;display:flex;flex-direction:column;align-items:center;text-align:center;height:198px;justify-content:center;">
+          <div style="width:52px;height:52px;border:1px dashed var(--border-3);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);margin-bottom:14px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:500;">No lessons match "backprop"</div>
+          <div style="color:var(--muted);font-size:13px;margin-top:4px;">Try clearing filters, or browse all lessons.</div>
+          <button style="margin-top:14px;padding:9px 16px;border:1px solid var(--border-3);background:var(--surface-2);border-radius:9px;color:var(--text);font-size:13px;">Clear filters</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== SECTION 2: 3D LESSON =============================== -->
+  <section id="2a" style="max-width:1440px;margin:0 auto 80px;">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;">
+      <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(0,226,138,.3);border-radius:5px;">2a</span>
+      <div class="mono" style="color:var(--muted);font-size:12px;letter-spacing:.08em;">3D LESSON · HORIZONTAL vs VERTICAL SCALING · 3 PAGES · TABS · NOTES · FAV</div>
+      <div style="height:1px;flex:1;background:linear-gradient(90deg,var(--border-2),transparent);"></div>
+    </div>
+
+    <div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap;">
+      <!-- DESKTOP 1280 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">DESKTOP · 1280</div>
+        <div style="width:1280px;height:860px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;">
+          <!-- top -->
+          <div style="display:flex;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);gap:16px;">
+            <button style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px;background:transparent;border:0;padding:6px 8px;border-radius:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>Library
+            </button>
+            <div style="color:var(--muted);font-size:13px;">Concepts / Scaling /</div>
+            <div style="color:var(--text);font-size:13px;font-weight:500;">Horizontal vs Vertical Scaling</div>
+            <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+              <button style="width:34px;height:34px;background:var(--surface);border:1px solid var(--border-2);border-radius:9px;color:var(--accent);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+              <button style="padding:7px 12px;background:var(--surface);border:1px solid var(--border-2);border-radius:9px;color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:6px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Notes
+                <span class="mono" style="padding:0 5px;background:var(--surface-3);color:var(--accent);font-size:10px;border-radius:3px;">2</span>
+              </button>
+              <button style="padding:7px 12px;background:var(--surface);border:1px solid var(--border-2);border-radius:9px;color:var(--text-2);font-size:12px;">Share</button>
+            </div>
+          </div>
+
+          <!-- page tabs -->
+          <div style="display:flex;padding:0 24px;border-bottom:1px solid var(--border);gap:2px;">
+            <div style="padding:12px 4px;font-size:13px;color:var(--text);border-bottom:2px solid var(--accent);margin-bottom:-1px;display:flex;align-items:center;gap:8px;">
+              <span class="mono" style="color:var(--accent);font-size:11px;">01</span>The two shapes
+            </div>
+            <div style="padding:12px 16px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;">
+              <span class="mono" style="font-size:11px;">02</span>Throughput &amp; failure
+            </div>
+            <div style="padding:12px 16px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;">
+              <span class="mono" style="font-size:11px;">03</span>When to pick which
+            </div>
+            <div style="margin-left:auto;padding:12px 4px;color:var(--muted);font-size:11px;" class="mono">Page 1 / 3 · 42%</div>
+          </div>
+
+          <!-- body split -->
+          <div style="display:grid;grid-template-columns:62fr 38fr;flex:1;min-height:0;">
+            <!-- 3D viewport -->
+            <div style="position:relative;background:radial-gradient(700px 400px at 50% 55%,#0A1015,#000);border-right:1px solid var(--border);overflow:hidden;" class="scene3d">
+              <div class="grid-bg" style="position:absolute;inset:0;opacity:.4;"></div>
+
+              <!-- Left half: SCALE UP (one big rack) -->
+              <div style="position:absolute;left:0;top:0;width:50%;height:100%;">
+                <div style="position:absolute;top:14px;left:16px;" class="mono">
+                  <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;">MODE A · SCALE UP</div>
+                  <div style="font-size:16px;font-weight:600;color:var(--text);margin-top:2px;">1 × 96 vCPU</div>
+                </div>
+                <div class="stage" style="position:absolute;left:50%;top:52%;width:220px;height:200px;margin-left:-110px;margin-top:-100px;">
+                  <div class="rack" style="width:120px;height:180px;left:50px;top:10px;">
+                    <div class="face top" style="width:120px;height:120px;transform:translateZ(180px) rotateX(-90deg) translateY(60px);"></div>
+                    <div class="face side" style="width:120px;height:180px;transform:rotateY(-90deg) translateZ(0);left:0;"></div>
+                    <div class="face front" style="width:120px;height:180px;background:linear-gradient(180deg,#141821,#080A0E);">
+                      <div style="position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;">
+                        <div style="display:flex;gap:4px;"><span class="led"></span><span class="led b"></span><span class="led c"></span></div>
+                        <span class="mono" style="font-size:9px;color:var(--muted);">SRV-01</span>
+                      </div>
+                      <div style="position:absolute;top:28px;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;">
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                        <div style="height:8px;background:#1A1F2A;border-radius:2px;border:1px solid #23293A;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="position:absolute;bottom:14px;left:16px;right:50%;padding-right:12px;">
+                  <div class="mono" style="font-size:10px;color:var(--muted);">CPU · 92%</div>
+                  <div style="height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:4px;"><div style="width:92%;height:100%;background:linear-gradient(90deg,var(--accent),var(--warn));"></div></div>
+                </div>
+              </div>
+
+              <!-- divider -->
+              <div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:linear-gradient(180deg,transparent,var(--border-2) 30%,var(--border-2) 70%,transparent);"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg);border:1px solid var(--border-2);border-radius:20px;padding:4px 10px;" class="mono">
+                <span style="font-size:10px;color:var(--muted);letter-spacing:.15em;">VS</span>
+              </div>
+
+              <!-- Right half: SCALE OUT (5 racks + LB) -->
+              <div style="position:absolute;right:0;top:0;width:50%;height:100%;">
+                <div style="position:absolute;top:14px;left:16px;" class="mono">
+                  <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;">MODE B · SCALE OUT</div>
+                  <div style="font-size:16px;font-weight:600;color:var(--text);margin-top:2px;">6 × 16 vCPU</div>
+                </div>
+                <!-- LB above -->
+                <div style="position:absolute;top:52px;left:50%;transform:translateX(-50%);padding:6px 14px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--accent);border-radius:8px;box-shadow:0 0 20px rgba(0,226,138,.2);">
+                  <div class="mono" style="font-size:10px;color:var(--accent);letter-spacing:.08em;">LOAD BALANCER</div>
+                </div>
+                <!-- connector lines -->
+                <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 400 400" preserveAspectRatio="none">
+                  <g stroke="var(--border-3)" stroke-width="1" fill="none" opacity=".6">
+                    <path d="M200 90 C 90 130, 60 180, 60 220"/>
+                    <path d="M200 90 C 140 130, 130 180, 130 220"/>
+                    <path d="M200 90 L 200 220"/>
+                    <path d="M200 90 C 260 130, 270 180, 270 220"/>
+                    <path d="M200 90 C 310 130, 340 180, 340 220"/>
+                  </g>
+                  <!-- animated req dot on center line -->
+                  <circle cx="200" cy="90" r="5" fill="var(--req)"><animate attributeName="cy" values="90;220" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.4s" repeatCount="indefinite"/></circle>
+                  <circle cx="200" cy="90" r="5" fill="var(--req)"><animate attributeName="cy" values="90;220" dur="1.4s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="cx" values="200;60" dur="1.4s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.4s" begin="0.4s" repeatCount="indefinite"/></circle>
+                  <circle cx="200" cy="90" r="5" fill="var(--req)"><animate attributeName="cy" values="90;220" dur="1.4s" begin="0.7s" repeatCount="indefinite"/><animate attributeName="cx" values="200;340" dur="1.4s" begin="0.7s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.4s" begin="0.7s" repeatCount="indefinite"/></circle>
+                </svg>
+                <!-- 5 racks -->
+                <div class="stage" style="position:absolute;left:50%;top:65%;width:340px;height:100px;margin-left:-170px;margin-top:-50px;">
+                  <div class="rack" style="width:40px;height:70px;left:0;">
+                    <div class="face top" style="width:40px;height:40px;transform:translateZ(70px) rotateX(-90deg) translateY(20px);"></div>
+                    <div class="face front" style="width:40px;height:70px;"><div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div><div style="position:absolute;top:20px;left:5px;right:5px;height:2px;background:#252A34;"></div><div style="position:absolute;top:26px;left:5px;right:5px;height:2px;background:#252A34;"></div><div style="position:absolute;top:32px;left:5px;right:5px;height:2px;background:#252A34;"></div></div>
+                  </div>
+                  <div class="rack" style="width:40px;height:70px;left:70px;">
+                    <div class="face top" style="width:40px;height:40px;transform:translateZ(70px) rotateX(-90deg) translateY(20px);"></div>
+                    <div class="face front" style="width:40px;height:70px;"><div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led c"></span></div><div style="position:absolute;top:20px;left:5px;right:5px;height:2px;background:#252A34;"></div><div style="position:absolute;top:26px;left:5px;right:5px;height:2px;background:#252A34;"></div></div>
+                  </div>
+                  <div class="rack" style="width:40px;height:70px;left:140px;">
+                    <div class="face top" style="width:40px;height:40px;transform:translateZ(70px) rotateX(-90deg) translateY(20px);"></div>
+                    <div class="face front" style="width:40px;height:70px;"><div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div><div style="position:absolute;top:20px;left:5px;right:5px;height:2px;background:#252A34;"></div></div>
+                  </div>
+                  <div class="rack" style="width:40px;height:70px;left:210px;">
+                    <div class="face top" style="width:40px;height:40px;transform:translateZ(70px) rotateX(-90deg) translateY(20px);"></div>
+                    <div class="face front" style="width:40px;height:70px;"><div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span></div></div>
+                  </div>
+                  <div class="rack" style="width:40px;height:70px;left:280px;">
+                    <div class="face top" style="width:40px;height:40px;transform:translateZ(70px) rotateX(-90deg) translateY(20px);"></div>
+                    <div class="face front" style="width:40px;height:70px;"><div style="position:absolute;top:6px;left:6px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div></div>
+                  </div>
+                </div>
+                <div style="position:absolute;bottom:14px;right:16px;left:50%;padding-left:12px;">
+                  <div class="mono" style="font-size:10px;color:var(--muted);">CPU per node · 34% avg</div>
+                  <div style="height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:4px;"><div style="width:34%;height:100%;background:var(--accent);"></div></div>
+                </div>
+              </div>
+
+              <!-- top HUD -->
+              <div style="position:absolute;top:14px;right:16px;display:flex;gap:10px;">
+                <div style="background:rgba(10,11,13,.8);backdrop-filter:blur(10px);border:1px solid var(--border-2);border-radius:10px;padding:10px 14px;">
+                  <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">THROUGHPUT</div>
+                  <div class="mono" style="font-size:20px;font-weight:600;color:var(--accent);margin-top:2px;">14.2k <span style="color:var(--muted);font-size:11px;font-weight:400;">req/s</span></div>
+                  <div style="height:24px;margin-top:6px;display:flex;gap:2px;align-items:flex-end;width:120px;">
+                    <div style="flex:1;height:20%;background:var(--surface-3);"></div><div style="flex:1;height:32%;background:var(--surface-3);"></div><div style="flex:1;height:45%;background:var(--accent);opacity:.5;"></div><div style="flex:1;height:58%;background:var(--accent);opacity:.65;"></div><div style="flex:1;height:72%;background:var(--accent);opacity:.8;"></div><div style="flex:1;height:88%;background:var(--accent);"></div><div style="flex:1;height:100%;background:var(--accent);"></div>
+                  </div>
+                </div>
+                <div style="background:rgba(10,11,13,.8);backdrop-filter:blur(10px);border:1px solid var(--border-2);border-radius:10px;padding:10px 14px;">
+                  <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">p99 LATENCY</div>
+                  <div class="mono" style="font-size:20px;font-weight:600;color:var(--warn);margin-top:2px;">142 <span style="color:var(--muted);font-size:11px;font-weight:400;">ms</span></div>
+                </div>
+              </div>
+
+              <div style="position:absolute;top:120px;right:16px;background:rgba(10,11,13,.7);border:1px solid var(--border-2);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--muted);" class="mono">drag · orbit ┃ scroll · zoom</div>
+
+              <!-- LEGEND -->
+              <div style="position:absolute;bottom:70px;left:16px;display:flex;flex-direction:column;gap:5px;font-size:11px;" class="mono">
+                <div style="display:flex;align-items:center;gap:8px;color:var(--text-2);"><span style="width:8px;height:8px;background:var(--req);border-radius:50%;"></span><span style="color:var(--muted);">●</span>request</div>
+                <div style="display:flex;align-items:center;gap:8px;color:var(--text-2);"><span style="width:8px;height:8px;background:var(--ok);border-radius:50%;"></span><span style="color:var(--muted);">✓</span>success</div>
+                <div style="display:flex;align-items:center;gap:8px;color:var(--text-2);"><span style="width:8px;height:8px;background:var(--err);"></span><span style="color:var(--muted);">✕</span>failure</div>
+              </div>
+
+              <!-- Bottom control bar -->
+              <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;background:rgba(10,11,13,.9);backdrop-filter:blur(16px);border:1px solid var(--border-2);border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,.6);">
+                <div style="display:flex;gap:2px;padding:3px;background:var(--surface-2);border-radius:9px;">
+                  <button style="padding:9px 14px;background:transparent;color:var(--muted);border:0;font-size:13px;border-radius:6px;">Scale up</button>
+                  <button style="padding:9px 14px;background:var(--surface-3);color:var(--text);border:1px solid var(--border-2);font-size:13px;border-radius:6px;">Scale out</button>
+                  <button style="padding:9px 14px;background:transparent;color:var(--muted);border:0;font-size:13px;border-radius:6px;">Both</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:0 14px;border-left:1px solid var(--border-2);border-right:1px solid var(--border-2);">
+                  <span class="mono" style="font-size:10px;color:var(--muted);">NODES</span>
+                  <button style="width:26px;height:26px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);">−</button>
+                  <span class="mono" style="font-size:14px;min-width:16px;text-align:center;">6</span>
+                  <button style="width:26px;height:26px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);">+</button>
+                </div>
+                <button title="Reset camera" style="width:38px;height:38px;background:transparent;border:0;border-radius:9px;color:var(--text-2);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/></svg>
+                </button>
+                <button title="Fail a node" style="width:38px;height:38px;background:transparent;border:0;border-radius:9px;color:var(--err);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- explanation panel -->
+            <div style="overflow-y:auto;display:flex;flex-direction:column;">
+              <div style="padding:24px 28px 20px;">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                  <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);border-radius:5px;border:1px solid rgba(0,226,138,.35);">3D · Beginner</span>
+                  <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--surface);color:var(--muted);border-radius:5px;border:1px solid var(--border);">04:20</span>
+                </div>
+                <h1 style="font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px;line-height:1.1;">The two shapes of scaling</h1>
+                <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 16px;">When one machine can't keep up, you have two moves. Make it bigger (<em style="color:var(--text);font-style:normal;">vertical</em>), or add more (<em style="color:var(--text);font-style:normal;">horizontal</em>). Watch both racks side by side, then tap <span class="mono" style="font-size:12px;color:var(--err);">fail a node</span> to see how each survives.</p>
+
+                <h3 style="font-size:14px;font-weight:600;margin:20px 0 6px;color:var(--text);display:flex;align-items:center;gap:8px;"><span class="mono" style="font-size:10px;padding:2px 6px;background:var(--surface-3);color:var(--accent);border-radius:4px;">A</span>Vertical — scale up</h3>
+                <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 8px;">Move to a bigger box: more CPU, more RAM, faster disks. Simple, no code changes, and every request goes to the same place. But hardware has a ceiling, and the machine is a single point of failure.</p>
+
+                <h3 style="font-size:14px;font-weight:600;margin:20px 0 6px;color:var(--text);display:flex;align-items:center;gap:8px;"><span class="mono" style="font-size:10px;padding:2px 6px;background:var(--surface-3);color:var(--accent);border-radius:4px;">B</span>Horizontal — scale out</h3>
+                <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 12px;">Put a load balancer in front of many smaller machines. Each is disposable. Failure is absorbed instead of downtime. In exchange, services must be stateless (or externalize state).</p>
+
+                <!-- inline note -->
+                <div style="background:linear-gradient(135deg,rgba(0,226,138,.08),transparent);border:1px solid rgba(0,226,138,.25);border-radius:12px;padding:14px;margin:20px 0;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                    <span class="mono" style="font-size:10px;letter-spacing:.1em;color:var(--accent);">YOUR NOTE · page 1</span>
+                    <span class="mono" style="margin-left:auto;font-size:10px;color:var(--muted);">Jul 12</span>
+                  </div>
+                  <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Ask Priya about the p99 curve — does it flatten because the LB is a bottleneck, or because of coordination overhead across replicas?</div>
+                </div>
+
+                <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:14px 16px;margin:16px 0;">
+                  <div class="mono" style="color:var(--muted);font-size:10px;letter-spacing:.08em;margin-bottom:6px;">TRY IT</div>
+                  <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Bring <span class="mono" style="color:var(--accent);">NODES</span> up from 1 → 8. Watch throughput climb while p99 flattens after ~5.</div>
+                </div>
+
+                <h3 style="font-size:15px;font-weight:600;margin:22px 0 10px;">Key takeaways</h3>
+                <ul style="padding-left:0;list-style:none;margin:0;display:flex;flex-direction:column;gap:9px;">
+                  <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>Vertical is fast; horizontal is survivable.</li>
+                  <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>Horizontal needs a load balancer + stateless services.</li>
+                  <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>Throughput scales roughly linearly; latency doesn't.</li>
+                </ul>
+
+                <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;">
+                  <button style="flex:1;padding:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text-2);border-radius:10px;font-size:13px;">← CDNs</button>
+                  <button style="flex:2;padding:11px;background:var(--accent);color:#001910;border:0;border-radius:10px;font-size:13px;font-weight:600;">Page 2: Throughput &amp; failure →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE 375 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">MOBILE · 375 · stacked + sticky controls</div>
+        <div style="width:375px;height:812px;background:var(--bg);border:1px solid var(--border);border-radius:36px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+          <div style="display:flex;justify-content:space-between;padding:14px 24px 4px;font-size:12px;color:var(--text);" class="mono"><span>9:41</span><span>●●● ▮</span></div>
+          <div style="display:flex;align-items:center;padding:6px 14px 10px;gap:8px;border-bottom:1px solid var(--border);">
+            <button style="width:40px;height:40px;border-radius:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div style="flex:1;text-align:center;">
+              <div class="mono" style="font-size:10px;color:var(--muted);">CONCEPTS · SCALING</div>
+              <div style="font-size:14px;font-weight:600;margin-top:1px;">Horiz vs Vert Scaling</div>
+            </div>
+            <button style="width:40px;height:40px;border-radius:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--accent);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+          </div>
+          <!-- page tabs -->
+          <div style="display:flex;padding:8px 14px;gap:6px;border-bottom:1px solid var(--border);overflow-x:auto;">
+            <div style="padding:6px 10px;font-size:12px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:7px;white-space:nowrap;"><span class="mono" style="color:var(--accent);font-size:10px;margin-right:4px;">01</span>The two shapes</div>
+            <div style="padding:6px 10px;font-size:12px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:10px;margin-right:4px;">02</span>Throughput</div>
+            <div style="padding:6px 10px;font-size:12px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:10px;margin-right:4px;">03</span>When to pick</div>
+          </div>
+          <!-- 3D viewport -->
+          <div style="height:280px;background:radial-gradient(300px 200px at 50% 55%,#0A1015,#000);position:relative;border-bottom:1px solid var(--border);" class="scene3d">
+            <div class="grid-bg" style="position:absolute;inset:0;opacity:.4;"></div>
+            <!-- LB + 4 racks -->
+            <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:5px 12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--accent);border-radius:7px;box-shadow:0 0 16px rgba(0,226,138,.25);"><div class="mono" style="font-size:9px;color:var(--accent);">LOAD BALANCER</div></div>
+            <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 375 280" preserveAspectRatio="none">
+              <g stroke="var(--border-3)" stroke-width="1" fill="none" opacity=".6">
+                <path d="M187 40 C 70 100, 60 160, 60 190"/>
+                <path d="M187 40 L 140 190"/>
+                <path d="M187 40 L 230 190"/>
+                <path d="M187 40 C 300 100, 315 160, 315 190"/>
+              </g>
+              <circle cx="187" cy="40" r="4" fill="var(--req)"><animate attributeName="cy" values="40;190" dur="1.4s" repeatCount="indefinite"/></circle>
+            </svg>
+            <div class="stage" style="position:absolute;left:50%;top:70%;width:300px;height:70px;margin-left:-150px;margin-top:-35px;">
+              <div class="rack" style="width:34px;height:56px;left:15px;"><div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div><div class="face front" style="width:34px;height:56px;"><div style="position:absolute;top:5px;left:5px;display:flex;gap:3px;"><span class="led"></span><span class="led b"></span></div></div></div>
+              <div class="rack" style="width:34px;height:56px;left:110px;"><div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div><div class="face front" style="width:34px;height:56px;"><div style="position:absolute;top:5px;left:5px;display:flex;gap:3px;"><span class="led"></span></div></div></div>
+              <div class="rack" style="width:34px;height:56px;left:180px;"><div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div><div class="face front" style="width:34px;height:56px;"><div style="position:absolute;top:5px;left:5px;display:flex;gap:3px;"><span class="led b"></span><span class="led"></span></div></div></div>
+              <div class="rack" style="width:34px;height:56px;left:250px;"><div class="face top" style="width:34px;height:34px;transform:translateZ(56px) rotateX(-90deg) translateY(17px);"></div><div class="face front" style="width:34px;height:56px;"><div style="position:absolute;top:5px;left:5px;display:flex;gap:3px;"><span class="led c"></span></div></div></div>
+            </div>
+            <div style="position:absolute;top:10px;left:10px;background:rgba(10,11,13,.85);border:1px solid var(--border-2);border-radius:8px;padding:6px 10px;">
+              <div class="mono" style="font-size:16px;font-weight:600;color:var(--accent);">8.4k <span style="color:var(--muted);font-size:10px;font-weight:400;">req/s</span></div>
+            </div>
+            <div style="position:absolute;top:10px;right:10px;background:rgba(10,11,13,.7);border:1px solid var(--border-2);border-radius:8px;padding:5px 8px;font-size:10px;color:var(--muted);" class="mono">pinch · drag</div>
+          </div>
+          <!-- explanation -->
+          <div style="flex:1;overflow-y:auto;padding:16px 16px 130px;">
+            <h1 style="font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px;">The two shapes of scaling</h1>
+            <p style="color:var(--text-2);font-size:13px;line-height:1.55;margin:0 0 12px;">Make one machine bigger, or add more machines? Watch both.</p>
+            <h3 style="font-size:13px;font-weight:600;margin:14px 0 4px;">Vertical (scale up)</h3>
+            <p style="color:var(--text-2);font-size:13px;line-height:1.55;margin:0 0 8px;">More CPU, more RAM. Simple — but you run out of bigger.</p>
+            <h3 style="font-size:13px;font-weight:600;margin:12px 0 4px;">Horizontal (scale out)</h3>
+            <p style="color:var(--text-2);font-size:13px;line-height:1.55;margin:0 0 10px;">Load balancer + many small machines. Failures absorbed; services stateless.</p>
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:10px;padding:12px;margin:12px 0;">
+              <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">KEY TAKEAWAYS</div>
+              <ul style="padding-left:0;list-style:none;margin:8px 0 0;display:flex;flex-direction:column;gap:6px;">
+                <li style="display:flex;gap:8px;font-size:13px;color:var(--text-2);"><span style="color:var(--accent);">◆</span>Vertical: fast. Horizontal: resilient.</li>
+                <li style="display:flex;gap:8px;font-size:13px;color:var(--text-2);"><span style="color:var(--accent);">◆</span>Throughput scales; latency doesn't.</li>
+              </ul>
+            </div>
+          </div>
+          <!-- Sticky control bar -->
+          <div style="position:absolute;bottom:14px;left:12px;right:12px;background:rgba(10,11,13,.95);backdrop-filter:blur(24px);border:1px solid var(--border-2);border-radius:16px;padding:8px;box-shadow:0 20px 40px rgba(0,0,0,.6);">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <div style="display:flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:9px;flex:1;">
+                <button style="flex:1;padding:10px;color:var(--muted);background:transparent;border:0;font-size:13px;border-radius:7px;min-height:44px;">Up</button>
+                <button style="flex:1;padding:10px;color:var(--text);background:var(--surface-3);border:1px solid var(--border-2);font-size:13px;border-radius:7px;min-height:44px;">Out</button>
+              </div>
+              <button style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/></svg></button>
+              <button style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--err);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;">
+              <div class="mono" style="font-size:11px;color:var(--muted);">NODES <span style="color:var(--text);font-size:14px;font-weight:600;margin-left:6px;">6</span></div>
+              <div style="display:flex;gap:6px;"><button style="width:32px;height:32px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:8px;color:var(--text-2);">−</button><button style="width:32px;height:32px;background:var(--accent);border:0;border-radius:8px;color:#001910;font-weight:600;">+</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================== SECTION 3: 2D LESSON =============================== -->
+  <section id="3a" style="max-width:1440px;margin:0 auto 80px;">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;">
+      <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(0,226,138,.3);border-radius:5px;">3a</span>
+      <div class="mono" style="color:var(--muted);font-size:12px;letter-spacing:.08em;">2D LESSON · MESSAGE QUEUE · 5 PAGES · LABELED MSG CHIPS · PUSH vs POLL · FANOUT</div>
+      <div style="height:1px;flex:1;background:linear-gradient(90deg,var(--border-2),transparent);"></div>
+    </div>
+
+    <div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap;">
+      <!-- DESKTOP 1280 -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">DESKTOP · 1280 · page 3/5 · multi-producer, single consumer</div>
+        <div style="width:1280px;height:860px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;">
+          <!-- top -->
+          <div style="display:flex;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);gap:16px;">
+            <button style="color:var(--text-2);font-size:13px;background:transparent;border:0;padding:6px 8px;display:flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>Library</button>
+            <div style="color:var(--muted);font-size:13px;">Concepts / Messaging /</div>
+            <div style="color:var(--text);font-size:13px;font-weight:500;">What Is a Message Queue?</div>
+            <div style="margin-left:auto;display:flex;gap:6px;">
+              <button style="width:34px;height:34px;background:var(--surface);border:1px solid var(--border-2);border-radius:9px;color:var(--muted);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg></button>
+              <button style="padding:7px 12px;background:var(--surface);border:1px solid var(--border-2);border-radius:9px;color:var(--text-2);font-size:12px;">Notes <span class="mono" style="color:var(--accent);margin-left:4px;">5</span></button>
+            </div>
+          </div>
+
+          <!-- page tabs 5 pages -->
+          <div style="display:flex;padding:0 24px;border-bottom:1px solid var(--border);gap:0;overflow-x:auto;">
+            <div style="padding:12px 14px;font-size:13px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:11px;margin-right:6px;">01</span>What &amp; why</div>
+            <div style="padding:12px 14px;font-size:13px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:11px;margin-right:6px;">02</span>One → one</div>
+            <div style="padding:12px 14px;font-size:13px;color:var(--text);border-bottom:2px solid var(--accent);margin-bottom:-1px;white-space:nowrap;"><span class="mono" style="color:var(--accent);font-size:11px;margin-right:6px;">03</span>Many → one</div>
+            <div style="padding:12px 14px;font-size:13px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:11px;margin-right:6px;">04</span>Many → many (fanout)</div>
+            <div style="padding:12px 14px;font-size:13px;color:var(--muted);white-space:nowrap;"><span class="mono" style="font-size:11px;margin-right:6px;">05</span>Push vs poll</div>
+            <div style="margin-left:auto;padding:12px 4px;color:var(--muted);font-size:11px;" class="mono">Page 3 / 5 · 60%</div>
+          </div>
+
+          <!-- body -->
+          <div style="display:grid;grid-template-columns:62fr 38fr;flex:1;min-height:0;">
+            <!-- 2D scene -->
+            <div style="position:relative;background:#040507;border-right:1px solid var(--border);overflow:hidden;" class="dot-bg">
+
+              <!-- 3 producers -->
+              <div style="position:absolute;left:40px;top:120px;display:flex;flex-direction:column;gap:44px;">
+                <div style="width:120px;padding:12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:10px;box-shadow:0 0 20px rgba(91,140,255,.15);">
+                  <div class="mono" style="font-size:9px;color:var(--muted);letter-spacing:.1em;">PRODUCER</div>
+                  <div style="font-size:13px;font-weight:600;margin-top:2px;color:#B4D4FF;">payments-svc</div>
+                  <div class="mono" style="font-size:10px;color:var(--muted);margin-top:6px;">rate: 3.2/s</div>
+                  <div style="height:2px;background:var(--surface-3);margin-top:6px;border-radius:1px;overflow:hidden;"><div style="width:70%;height:100%;background:var(--req);animation:glow-sweep 1.8s linear infinite;"></div></div>
+                </div>
+                <div style="width:120px;padding:12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:10px;">
+                  <div class="mono" style="font-size:9px;color:var(--muted);letter-spacing:.1em;">PRODUCER</div>
+                  <div style="font-size:13px;font-weight:600;margin-top:2px;color:#B4D4FF;">orders-svc</div>
+                  <div class="mono" style="font-size:10px;color:var(--muted);margin-top:6px;">rate: 2.1/s</div>
+                </div>
+                <div style="width:120px;padding:12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:10px;">
+                  <div class="mono" style="font-size:9px;color:var(--muted);letter-spacing:.1em;">PRODUCER</div>
+                  <div style="font-size:13px;font-weight:600;margin-top:2px;color:#B4D4FF;">emails-svc</div>
+                  <div class="mono" style="font-size:10px;color:var(--muted);margin-top:6px;">rate: 0.9/s</div>
+                </div>
+              </div>
+
+              <!-- animated arrows + MSG chips flying to queue -->
+              <svg style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;" viewBox="0 0 780 640" preserveAspectRatio="none">
+                <defs>
+                  <marker id="arrHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--border-3)"/></marker>
+                  <path id="p2q-1" d="M 190 165 L 355 320" />
+                  <path id="p2q-2" d="M 190 315 L 355 320" />
+                  <path id="p2q-3" d="M 190 465 L 355 320" />
+                  <path id="q2c"   d="M 480 320 L 660 320" />
+                </defs>
+                <use href="#p2q-1" stroke="var(--border-3)" stroke-width="1" marker-end="url(#arrHead)"/>
+                <use href="#p2q-2" stroke="var(--border-3)" stroke-width="1" marker-end="url(#arrHead)"/>
+                <use href="#p2q-3" stroke="var(--border-3)" stroke-width="1" marker-end="url(#arrHead)"/>
+                <use href="#q2c" stroke="var(--border-3)" stroke-width="1" marker-end="url(#arrHead)"/>
+                <text x="270" y="228" font-family="JetBrains Mono" font-size="9" fill="var(--muted)">publish()</text>
+                <text x="570" y="310" font-family="JetBrains Mono" font-size="9" fill="var(--muted)">deliver()</text>
+              </svg>
+
+              <!-- MSG chips traveling producer→queue via animateMotion -->
+              <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" viewBox="0 0 780 640" preserveAspectRatio="none" overflow="visible">
+                <g><rect x="-30" y="-11" width="60" height="22" rx="5" fill="#161A1F" stroke="#333947"/><text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#F2F4F7" font-weight="600">MSG 44</text><circle cx="-22" cy="0" r="3" fill="#5B8CFF"/><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p2q-1"/></animateMotion></g>
+                <g><rect x="-30" y="-11" width="60" height="22" rx="5" fill="#161A1F" stroke="#333947"/><text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#F2F4F7" font-weight="600">MSG 45</text><circle cx="-22" cy="0" r="3" fill="#5B8CFF"/><animateMotion dur="2.6s" begin="0.9s" repeatCount="indefinite"><mpath href="#p2q-2"/></animateMotion></g>
+                <g><rect x="-30" y="-11" width="60" height="22" rx="5" fill="#161A1F" stroke="#333947"/><text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#F2F4F7" font-weight="600">MSG 46</text><circle cx="-22" cy="0" r="3" fill="#5B8CFF"/><animateMotion dur="2.6s" begin="1.7s" repeatCount="indefinite"><mpath href="#p2q-3"/></animateMotion></g>
+                <!-- queue -> consumer: labeled OK -->
+                <g><rect x="-30" y="-11" width="60" height="22" rx="5" fill="#161A1F" stroke="#333947"/><text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#F2F4F7" font-weight="600">MSG 41</text><circle cx="-22" cy="0" r="3" fill="#00E28A"/><animateMotion dur="3.4s" repeatCount="indefinite"><mpath href="#q2c"/></animateMotion></g>
+                <g><rect x="-30" y="-11" width="60" height="22" rx="5" fill="#161A1F" stroke="#333947"/><text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#F2F4F7" font-weight="600">MSG 42</text><circle cx="-22" cy="0" r="3" fill="#00E28A"/><animateMotion dur="3.4s" begin="1.7s" repeatCount="indefinite"><mpath href="#q2c"/></animateMotion></g>
+              </svg>
+
+              <!-- Queue -->
+              <div style="position:absolute;left:355px;top:200px;width:130px;padding:14px 12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1.5px solid var(--accent);border-radius:12px;box-shadow:0 0 30px rgba(0,226,138,.2);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="mono" style="font-size:9px;color:var(--accent);letter-spacing:.1em;">QUEUE</div>
+                  <span class="mono" style="font-size:9px;padding:1px 5px;background:var(--accent-soft);color:var(--accent);border-radius:3px;">FIFO</span>
+                </div>
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">events.v1</div>
+                <!-- stack of MSG rows -->
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div style="padding:5px 7px;background:var(--surface-3);border:1px solid var(--border-3);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;font-weight:600;color:var(--text);display:flex;justify-content:space-between;align-items:center;">MSG 40 <span style="color:var(--muted);font-weight:400;">▶</span></div>
+                  <div style="padding:5px 7px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-2);">MSG 41</div>
+                  <div style="padding:5px 7px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-2);">MSG 42</div>
+                  <div style="padding:5px 7px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-2);">MSG 43</div>
+                  <div style="padding:5px 7px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--muted);opacity:.6;">MSG 44</div>
+                  <div style="padding:5px 7px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--muted);opacity:.4;">MSG 45</div>
+                  <div style="padding:3px 7px;background:var(--surface-2);border:1px dashed var(--border-2);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted);text-align:center;">+2 more</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);" class="mono">
+                  <span style="font-size:9px;color:var(--muted);">depth</span>
+                  <span style="font-size:11px;color:var(--warn);font-weight:600;">8</span>
+                </div>
+              </div>
+
+              <!-- Consumer -->
+              <div style="position:absolute;left:660px;top:275px;width:110px;padding:12px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--ok);border-radius:10px;box-shadow:0 0 20px rgba(0,226,138,.15);">
+                <div class="mono" style="font-size:9px;color:var(--muted);letter-spacing:.1em;">CONSUMER</div>
+                <div style="font-size:13px;font-weight:600;margin-top:2px;color:#B4F4D0;">worker-01</div>
+                <div class="mono" style="font-size:10px;color:var(--muted);margin-top:6px;">rate: 2.5/s</div>
+                <div style="margin-top:8px;padding:5px 7px;background:var(--surface-3);border:1px solid var(--ok);border-radius:5px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--ok);">
+                  <span style="font-size:9px;color:var(--muted);">processing:</span> MSG 39
+                </div>
+              </div>
+
+              <!-- Push vs poll indicator -->
+              <div style="position:absolute;left:520px;top:340px;padding:5px 10px;background:rgba(180,139,255,.14);border:1px solid rgba(180,139,255,.35);border-radius:6px;font-family:JetBrains Mono,monospace;font-size:10px;color:#D0B8FF;display:flex;align-items:center;gap:6px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 12h-16M4 12l5-5M4 12l5 5"/></svg>
+                POLL every 200ms
+              </div>
+
+              <!-- HUD -->
+              <div style="position:absolute;top:14px;left:14px;display:flex;gap:8px;">
+                <div style="background:rgba(10,11,13,.85);border:1px solid var(--border-2);border-radius:10px;padding:8px 12px;">
+                  <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">ARRIVAL</div>
+                  <div class="mono" style="font-size:16px;font-weight:600;color:var(--req);">6.2<span style="color:var(--muted);font-size:10px;">/s</span></div>
+                </div>
+                <div style="background:rgba(10,11,13,.85);border:1px solid var(--border-2);border-radius:10px;padding:8px 12px;">
+                  <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">DRAIN</div>
+                  <div class="mono" style="font-size:16px;font-weight:600;color:var(--ok);">2.5<span style="color:var(--muted);font-size:10px;">/s</span></div>
+                </div>
+                <div style="background:rgba(255,184,77,.08);border:1px solid rgba(255,184,77,.35);border-radius:10px;padding:8px 12px;">
+                  <div class="mono" style="color:var(--muted);font-size:9px;letter-spacing:.1em;">DEPTH</div>
+                  <div class="mono" style="font-size:16px;font-weight:600;color:var(--warn);">8 <span style="font-size:10px;">↑ growing</span></div>
+                </div>
+              </div>
+
+              <!-- Control bar -->
+              <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px 10px;background:rgba(10,11,13,.95);backdrop-filter:blur(14px);border:1px solid var(--border-2);border-radius:14px;align-items:center;min-width:600px;box-shadow:0 20px 40px rgba(0,0,0,.6);">
+                <button title="Prev step" style="width:36px;height:36px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M6 5v14l-4-7zM8 5h2v14H8zM10 12l10-7v14z"/></svg></button>
+                <button title="Play" style="width:36px;height:36px;border-radius:8px;background:var(--accent);color:#001910;border:0;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,226,138,.2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg></button>
+                <button title="Next step" style="width:36px;height:36px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M4 5v14l10-7zM14 5h2v14h-2zM18 5v14l4-7z"/></svg></button>
+                <div style="width:1px;height:24px;background:var(--border-2);margin:0 4px;"></div>
+                <span class="mono" style="font-size:10px;color:var(--muted);">SPEED</span>
+                <div style="display:flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:6px;">
+                  <button class="mono" style="padding:4px 8px;font-size:11px;background:transparent;color:var(--muted);border:0;border-radius:4px;">0.5×</button>
+                  <button class="mono" style="padding:4px 8px;font-size:11px;background:var(--surface-3);border:1px solid var(--border-2);color:var(--text);border-radius:4px;">1×</button>
+                  <button class="mono" style="padding:4px 8px;font-size:11px;background:transparent;color:var(--muted);border:0;border-radius:4px;">2×</button>
+                </div>
+                <div style="width:1px;height:24px;background:var(--border-2);margin:0 4px;"></div>
+                <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                  <span class="mono" style="font-size:10px;color:var(--muted);white-space:nowrap;">PRODUCER RATE</span>
+                  <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;position:relative;">
+                    <div style="position:absolute;inset:0 38% 0 0;background:linear-gradient(90deg,var(--req),var(--accent));border-radius:3px;"></div>
+                    <div style="position:absolute;left:62%;top:-5px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--accent);transform:translateX(-50%);box-shadow:0 4px 12px rgba(0,0,0,.5);"></div>
+                  </div>
+                  <span class="mono" style="font-size:11px;color:var(--text);min-width:44px;text-align:right;">6.2/s</span>
+                </div>
+              </div>
+
+              <div style="position:absolute;bottom:70px;right:16px;display:flex;gap:6px;">
+                <button class="mono" style="padding:6px 10px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:7px;font-size:10px;color:var(--text-2);">+ add producer</button>
+                <button class="mono" style="padding:6px 10px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:7px;font-size:10px;color:var(--text-2);">+ add consumer</button>
+              </div>
+            </div>
+
+            <!-- explanation -->
+            <div style="overflow-y:auto;padding:24px 28px 40px;">
+              <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <span class="mono" style="font-size:11px;padding:3px 8px;background:rgba(180,139,255,.14);color:#D0B8FF;border-radius:5px;border:1px solid rgba(180,139,255,.3);">2D · Beginner</span>
+                <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--surface);color:var(--muted);border-radius:5px;border:1px solid var(--border);">07:30</span>
+              </div>
+              <h1 style="font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px;line-height:1.15;">Many producers → one consumer</h1>
+              <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 16px;">Three services publish independently. One worker processes. Notice how bursts from any producer are absorbed by the queue — the consumer sees a smooth 2.5/s.</p>
+
+              <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;color:var(--text);">Ordering, per producer</h3>
+              <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 10px;">Because it's FIFO, order is preserved for messages from the <em style="font-style:normal;color:var(--text);">same</em> producer. Across producers, ordering isn't guaranteed — <span class="mono" style="font-size:12px;">MSG 44</span> from <span class="mono" style="font-size:12px;color:#B4D4FF;">payments</span> may land after <span class="mono" style="font-size:12px;">MSG 45</span> from <span class="mono" style="font-size:12px;color:#B4D4FF;">orders</span>.</p>
+
+              <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;color:var(--text);">Delivery: <span class="mono" style="color:#D0B8FF;font-size:12px;">poll</span> vs <span class="mono" style="color:var(--accent);font-size:12px;">push</span></h3>
+              <p style="color:var(--text-2);font-size:14px;line-height:1.6;margin:0 0 10px;">This diagram is on <span class="mono" style="font-size:12px;color:#D0B8FF;">poll</span>: worker asks the queue every 200ms. Toggle it — with <span class="mono" style="font-size:12px;color:var(--accent);">push</span>, the queue calls the worker as soon as a message lands. Push is lower latency; poll is simpler under back-pressure.</p>
+
+              <!-- backpressure warning -->
+              <div style="background:rgba(255,184,77,.06);border:1px solid rgba(255,184,77,.35);border-radius:12px;padding:12px 14px;margin:14px 0;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                  <span class="mono" style="font-size:10px;color:var(--warn);letter-spacing:.1em;">BACK-PRESSURE</span>
+                </div>
+                <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">Arrival is 6.2/s, drain is 2.5/s. Depth keeps growing — you either add consumers or shed load.</div>
+              </div>
+
+              <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:14px;margin:16px 0;">
+                <div class="mono" style="color:var(--muted);font-size:10px;letter-spacing:.1em;margin-bottom:6px;">TRY IT</div>
+                <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Drop the slider to 2/s — queue drains to 0. Push it to 12/s — depth explodes. Tap <span class="mono" style="color:var(--text);">+ add consumer</span> and watch drain double.</div>
+              </div>
+
+              <h3 style="font-size:15px;font-weight:600;margin:22px 0 10px;">Key takeaways</h3>
+              <ul style="padding-left:0;list-style:none;margin:0;display:flex;flex-direction:column;gap:9px;">
+                <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>Queues decouple <em style="font-style:normal;color:var(--text);">arrival</em> from <em style="font-style:normal;color:var(--text);">processing</em>.</li>
+                <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>FIFO holds per-producer; global order is not guaranteed.</li>
+                <li style="display:flex;gap:10px;font-size:14px;color:var(--text-2);line-height:1.5;"><span style="color:var(--accent);flex-shrink:0;">◆</span>If drain &lt; arrival for long, depth is unbounded.</li>
+              </ul>
+
+              <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;">
+                <button style="flex:1;padding:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text-2);border-radius:10px;font-size:13px;">← One → one</button>
+                <button style="flex:2;padding:11px;background:var(--accent);color:#001910;border:0;border-radius:10px;font-size:13px;font-weight:600;">Page 4: Fanout →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes drawer view -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">NOTES DRAWER · MARKDOWN · anchored to lesson &amp; page</div>
+        <div style="width:420px;height:860px;background:var(--bg);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            <div>
+              <div style="font-size:14px;font-weight:600;">Notes</div>
+              <div class="mono" style="font-size:10px;color:var(--muted);">Message Queue · 5 notes</div>
+            </div>
+            <button style="margin-left:auto;padding:6px 10px;background:var(--accent);color:#001910;border:0;border-radius:8px;font-size:12px;font-weight:600;">+ New</button>
+          </div>
+          <div style="padding:14px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;">
+            <!-- editor -->
+            <div style="background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div class="mono" style="font-size:10px;color:var(--accent);letter-spacing:.1em;">EDITING · page 03</div>
+                <div style="display:flex;gap:3px;">
+                  <button class="mono" style="padding:2px 6px;font-size:10px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:4px;color:var(--text-2);font-weight:700;">B</button>
+                  <button class="mono" style="padding:2px 6px;font-size:10px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-style:italic;">I</button>
+                  <button class="mono" style="padding:2px 6px;font-size:10px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);">‹/›</button>
+                  <button class="mono" style="padding:2px 6px;font-size:10px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);">•</button>
+                </div>
+              </div>
+              <div style="font-size:13px;color:var(--text);line-height:1.6;">
+                <strong>Question for tomorrow:</strong> if the consumer crashes mid-<code class="mono" style="padding:1px 4px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:3px;font-size:11px;">ack()</code>, do we lose <code class="mono" style="padding:1px 4px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:3px;font-size:11px;">MSG 39</code> or does it re-appear at the head?<br><br>
+                Also — <em>visibility timeout</em>: does the queue set it per-consumer or per-message?
+                <span style="display:inline-block;width:2px;height:14px;background:var(--accent);vertical-align:middle;margin-left:2px;animation:pulse-ring 1.2s ease-in-out infinite;"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+                <span class="mono" style="font-size:10px;color:var(--muted);">saved 3s ago</span>
+                <div style="display:flex;gap:6px;">
+                  <button style="padding:4px 10px;background:transparent;border:1px solid var(--border-2);color:var(--muted);border-radius:6px;font-size:11px;">Discard</button>
+                  <button style="padding:4px 10px;background:var(--accent);border:0;color:#001910;border-radius:6px;font-size:11px;font-weight:600;">Save</button>
+                </div>
+              </div>
+            </div>
+            <!-- existing notes -->
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px 14px;">
+              <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:4px;">page 01 · Jul 08</div>
+              <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Queues = <em>elasticity</em>. Kind of like a buffer in electronics — you smooth spikes, but you can't remove the average load.</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px 14px;">
+              <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:4px;">page 02 · Jul 10</div>
+              <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Difference vs pub/sub: queues deliver each message to <strong style="color:var(--text);">one</strong> consumer. Broadcast is next page.</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:12px 14px;">
+              <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:4px;">page 03 · Jul 12 · <span style="color:var(--accent);">current</span></div>
+              <div style="font-size:13px;color:var(--text-2);line-height:1.5;"><code class="mono" style="padding:1px 4px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:3px;font-size:11px;">arrival &gt; drain</code> → depth ↑ forever. Options: <br>1. more consumers<br>2. shed load<br>3. slower producer (rate limit)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE 375 · message queue -->
+      <div>
+        <div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:8px;">MOBILE · 375 · page 3/5</div>
+        <div style="width:375px;height:812px;background:var(--bg);border:1px solid var(--border);border-radius:36px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+          <div style="display:flex;justify-content:space-between;padding:14px 24px 4px;font-size:12px;color:var(--text);" class="mono"><span>9:41</span><span>●●● ▮</span></div>
+          <div style="display:flex;align-items:center;padding:6px 14px 10px;gap:8px;border-bottom:1px solid var(--border);">
+            <button style="width:40px;height:40px;border-radius:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div style="flex:1;text-align:center;">
+              <div class="mono" style="font-size:10px;color:var(--muted);">MESSAGING</div>
+              <div style="font-size:14px;font-weight:600;margin-top:1px;">Message Queue</div>
+            </div>
+            <button style="width:40px;height:40px;border-radius:11px;background:var(--surface);border:1px solid var(--border-2);color:var(--muted);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;margin:auto;"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+          </div>
+          <div style="display:flex;padding:8px 14px;gap:5px;border-bottom:1px solid var(--border);overflow-x:auto;">
+            <div style="padding:6px 9px;font-size:11px;color:var(--muted);white-space:nowrap;" class="mono">01</div>
+            <div style="padding:6px 9px;font-size:11px;color:var(--muted);white-space:nowrap;" class="mono">02</div>
+            <div style="padding:6px 10px;font-size:11px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:6px;white-space:nowrap;"><span class="mono" style="color:var(--accent);">03</span> Many→one</div>
+            <div style="padding:6px 9px;font-size:11px;color:var(--muted);white-space:nowrap;" class="mono">04</div>
+            <div style="padding:6px 9px;font-size:11px;color:var(--muted);white-space:nowrap;" class="mono">05</div>
+          </div>
+          <!-- 2D scene -->
+          <div style="height:280px;background:#040507;border-bottom:1px solid var(--border);position:relative;" class="dot-bg">
+            <!-- producers stacked left -->
+            <div style="position:absolute;left:12px;top:36px;display:flex;flex-direction:column;gap:14px;">
+              <div style="padding:6px 8px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:6px;"><div class="mono" style="font-size:8px;color:var(--muted);">PRODUCER</div><div style="font-size:10px;font-weight:600;color:#B4D4FF;">payments</div></div>
+              <div style="padding:6px 8px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:6px;"><div class="mono" style="font-size:8px;color:var(--muted);">PRODUCER</div><div style="font-size:10px;font-weight:600;color:#B4D4FF;">orders</div></div>
+              <div style="padding:6px 8px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--req);border-radius:6px;"><div class="mono" style="font-size:8px;color:var(--muted);">PRODUCER</div><div style="font-size:10px;font-weight:600;color:#B4D4FF;">emails</div></div>
+            </div>
+            <!-- arrows + MSG chips -->
+            <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" viewBox="0 0 375 280" preserveAspectRatio="none" overflow="visible">
+              <defs>
+                <path id="mp1" d="M 100 55 L 175 140"/>
+                <path id="mp2" d="M 100 100 L 175 140"/>
+                <path id="mp3" d="M 100 145 L 175 140"/>
+                <path id="mq2c" d="M 210 140 L 320 140"/>
+              </defs>
+              <use href="#mp1" stroke="var(--border-3)" stroke-width="1"/><use href="#mp2" stroke="var(--border-3)" stroke-width="1"/><use href="#mp3" stroke="var(--border-3)" stroke-width="1"/><use href="#mq2c" stroke="var(--border-3)" stroke-width="1"/>
+              <g><rect x="-24" y="-9" width="48" height="18" rx="4" fill="#161A1F" stroke="#333947"/><text x="0" y="3" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#F2F4F7" font-weight="600">MSG 44</text><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#mp1"/></animateMotion></g>
+              <g><rect x="-24" y="-9" width="48" height="18" rx="4" fill="#161A1F" stroke="#333947"/><text x="0" y="3" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#F2F4F7" font-weight="600">MSG 45</text><animateMotion dur="2.6s" begin="0.9s" repeatCount="indefinite"><mpath href="#mp2"/></animateMotion></g>
+              <g><rect x="-24" y="-9" width="48" height="18" rx="4" fill="#161A1F" stroke="#333947"/><text x="0" y="3" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#F2F4F7" font-weight="600">MSG 41</text><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#mq2c"/></animateMotion></g>
+            </svg>
+            <!-- Queue -->
+            <div style="position:absolute;left:175px;top:75px;width:60px;padding:6px 5px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1.5px solid var(--accent);border-radius:8px;box-shadow:0 0 20px rgba(0,226,138,.15);">
+              <div class="mono" style="font-size:8px;color:var(--accent);text-align:center;">QUEUE</div>
+              <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px;">
+                <div style="padding:2px 4px;background:var(--surface-3);border:1px solid var(--border-3);border-radius:3px;font-family:JetBrains Mono;font-size:8px;color:var(--text);">MSG 40</div>
+                <div style="padding:2px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:3px;font-family:JetBrains Mono;font-size:8px;color:var(--text-2);">MSG 41</div>
+                <div style="padding:2px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:3px;font-family:JetBrains Mono;font-size:8px;color:var(--text-2);">MSG 42</div>
+                <div style="padding:2px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:3px;font-family:JetBrains Mono;font-size:8px;color:var(--muted);opacity:.6;">MSG 43</div>
+              </div>
+            </div>
+            <!-- consumer -->
+            <div style="position:absolute;right:12px;top:118px;padding:6px 8px;background:linear-gradient(180deg,#0F1218,#080A0E);border:1px solid var(--ok);border-radius:6px;">
+              <div class="mono" style="font-size:8px;color:var(--muted);">CONSUMER</div>
+              <div style="font-size:10px;font-weight:600;color:#B4F4D0;">worker-01</div>
+            </div>
+            <!-- HUD -->
+            <div style="position:absolute;bottom:10px;left:10px;right:10px;display:flex;gap:6px;">
+              <div style="flex:1;background:rgba(10,11,13,.85);border:1px solid var(--border-2);border-radius:7px;padding:5px 8px;"><div class="mono" style="font-size:8px;color:var(--muted);">IN</div><div class="mono" style="font-size:11px;color:var(--req);font-weight:600;">6.2/s</div></div>
+              <div style="flex:1;background:rgba(10,11,13,.85);border:1px solid var(--border-2);border-radius:7px;padding:5px 8px;"><div class="mono" style="font-size:8px;color:var(--muted);">OUT</div><div class="mono" style="font-size:11px;color:var(--ok);font-weight:600;">2.5/s</div></div>
+              <div style="flex:1;background:rgba(255,184,77,.08);border:1px solid rgba(255,184,77,.35);border-radius:7px;padding:5px 8px;"><div class="mono" style="font-size:8px;color:var(--muted);">DEPTH</div><div class="mono" style="font-size:11px;color:var(--warn);font-weight:600;">8 ↑</div></div>
+            </div>
+          </div>
+          <!-- explanation -->
+          <div style="flex:1;overflow-y:auto;padding:14px 16px 130px;">
+            <h1 style="font-size:20px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px;">Many producers → one consumer</h1>
+            <p style="color:var(--text-2);font-size:13px;line-height:1.55;margin:0 0 12px;">Three services publish; one worker consumes. The queue absorbs bursts.</p>
+            <h3 style="font-size:13px;font-weight:600;margin:14px 0 4px;">Delivery: poll vs push</h3>
+            <p style="color:var(--text-2);font-size:13px;line-height:1.55;margin:0 0 10px;">This diagram polls every 200ms. <span class="mono" style="color:var(--accent);font-size:12px;">Push</span> is lower latency; poll survives back-pressure better.</p>
+            <div style="background:rgba(255,184,77,.06);border:1px solid rgba(255,184,77,.35);border-radius:10px;padding:10px;margin:10px 0;">
+              <div class="mono" style="font-size:9px;color:var(--warn);">BACK-PRESSURE</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:3px;">Arrival &gt; drain — add consumers or shed load.</div>
+            </div>
+          </div>
+          <!-- sticky controls -->
+          <div style="position:absolute;bottom:14px;left:12px;right:12px;background:rgba(10,11,13,.95);backdrop-filter:blur(24px);border:1px solid var(--border-2);border-radius:16px;padding:8px;box-shadow:0 20px 40px rgba(0,0,0,.6);">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <button style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M6 5v14l-4-7zM8 5h2v14H8zM10 12l10-7v14z"/></svg></button>
+              <button style="flex:1;height:44px;border-radius:10px;background:var(--accent);color:#001910;border:0;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>Play</button>
+              <button style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto;"><path d="M4 5v14l10-7zM14 5h2v14h-2zM18 5v14l4-7z"/></svg></button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:0 4px;">
+              <span class="mono" style="font-size:10px;color:var(--muted);white-space:nowrap;">RATE</span>
+              <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;position:relative;">
+                <div style="position:absolute;inset:0 38% 0 0;background:linear-gradient(90deg,var(--req),var(--accent));border-radius:3px;"></div>
+                <div style="position:absolute;left:62%;top:-6px;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--accent);transform:translateX(-50%);"></div>
+              </div>
+              <span class="mono" style="font-size:11px;color:var(--text);min-width:40px;text-align:right;">6.2/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================== SECTION 4: TOKENS · STATES · REDUCED MOTION =============================== -->
+  <section id="4a" style="max-width:1440px;margin:0 auto 60px;">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;">
+      <span class="mono" style="font-size:11px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(0,226,138,.3);border-radius:5px;">4a</span>
+      <div class="mono" style="color:var(--muted);font-size:12px;letter-spacing:.08em;">DESIGN SYSTEM · TOKENS · COMPONENT STATES · REDUCED-MOTION FALLBACK</div>
+      <div style="height:1px;flex:1;background:linear-gradient(90deg,var(--border-2),transparent);"></div>
+    </div>
+
+    <!-- tokens -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px;">
+      <div style="display:grid;grid-template-columns:1.3fr 1fr 1.3fr 1fr;gap:32px;">
+        <div>
+          <div class="mono" style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:12px;">SURFACES · AMOLED</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#000;border:1px solid var(--border);"></span><span class="mono" style="color:var(--muted);width:80px;">--bg</span><span class="mono">#000000</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#0A0B0D;border:1px solid var(--border);"></span><span class="mono" style="color:var(--muted);width:80px;">--surface</span><span class="mono">#0A0B0D</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#101215;border:1px solid var(--border);"></span><span class="mono" style="color:var(--muted);width:80px;">--surface-2</span><span class="mono">#101215</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#161A1F;border:1px solid var(--border);"></span><span class="mono" style="color:var(--muted);width:80px;">--surface-3</span><span class="mono">#161A1F</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#1B1F26;border:1px solid var(--border);"></span><span class="mono" style="color:var(--muted);width:80px;">--border</span><span class="mono">#1B1F26</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:12px;">ACCENT · EMERALD</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#00E28A;box-shadow:0 0 12px var(--accent-glow);"></span><span class="mono" style="color:var(--muted);width:70px;">--accent</span><span class="mono">#00E28A</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#4CFFB2;"></span><span class="mono" style="color:var(--muted);width:70px;">--accent-2</span><span class="mono">#4CFFB2</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#F2F4F7;"></span><span class="mono" style="color:var(--muted);width:70px;">--text</span><span class="mono">#F2F4F7</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:7px;background:#6E7787;"></span><span class="mono" style="color:var(--muted);width:70px;">--muted</span><span class="mono">#6E7787</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:12px;">FLOW PALETTE · color <em>+</em> shape</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px;">
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5" fill="#5B8CFF"/></svg><span class="mono" style="color:var(--muted);">request</span><span class="mono" style="margin-left:auto;">●</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M5 10l3 3 7-7" stroke="#00E28A" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="mono" style="color:var(--muted);">success</span><span class="mono" style="margin-left:auto;">✓</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M6 6l8 8M14 6l-8 8" stroke="#FF5A6A" stroke-width="2.5" stroke-linecap="round"/></svg><span class="mono" style="color:var(--muted);">failure</span><span class="mono" style="margin-left:auto;">✕</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M4 10a6 6 0 1 1 3 5.2" stroke="#FFB84D" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M3 12l1-3 3 1" stroke="#FFB84D" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="mono" style="color:var(--muted);">retry</span><span class="mono" style="margin-left:auto;">↻</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 3l6 7-6 7-6-7z" fill="#B48BFF"/></svg><span class="mono" style="color:var(--muted);">cache-hit</span><span class="mono" style="margin-left:auto;">◆</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" fill="none" stroke="#B48BFF" stroke-width="2" stroke-dasharray="2 2"/></svg><span class="mono" style="color:var(--muted);">cache-miss</span><span class="mono" style="margin-left:auto;">◇</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:12px;">TYPE · RADII · GRID</div>
+          <div class="mono" style="font-size:11px;color:var(--muted);line-height:1.8;">
+            font-sans: Inter Tight<br>
+            font-mono: JetBrains Mono<br>
+            radii: 6 / 10 / 14 / 20<br>
+            spacing: 4-based · shadcn/ui
+          </div>
+          <div style="margin-top:14px;">
+            <div style="font-size:22px;font-weight:600;letter-spacing:-.02em;">Aa — display</div>
+            <div style="font-size:14px;color:var(--text-2);">Aa — body 14</div>
+            <div style="font-size:12px;color:var(--muted);" class="mono">Aa — caption 12</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component states -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;">
+        <div class="mono" style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:16px;">BUTTON · STATES</div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
+          <div><div style="padding:10px;background:var(--accent);color:#001910;border-radius:9px;text-align:center;font-size:12px;font-weight:600;">Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">default</div></div>
+          <div><div style="padding:10px;background:#4CFFB2;color:#001910;border-radius:9px;text-align:center;font-size:12px;font-weight:600;box-shadow:0 4px 16px rgba(0,226,138,.4);">Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">hover</div></div>
+          <div><div style="padding:10px;background:#00A85F;color:#001910;border-radius:9px;text-align:center;font-size:12px;font-weight:600;">Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">active</div></div>
+          <div><div style="padding:10px;background:var(--accent);color:#001910;border-radius:9px;text-align:center;font-size:12px;font-weight:600;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent);">Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">focus</div></div>
+          <div><div style="padding:10px;background:var(--surface-2);color:var(--muted);border-radius:9px;text-align:center;font-size:12px;font-weight:600;">Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">disabled</div></div>
+          <div><div style="padding:10px;background:var(--accent);color:#001910;border-radius:9px;text-align:center;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;"><svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>Play</div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:5px;text-align:center;">loading</div></div>
+        </div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;">
+        <div class="mono" style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:16px;">CARD · STATES</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+          <div><div style="height:70px;background:var(--surface);border:1px solid var(--border-2);border-radius:10px;"></div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:6px;text-align:center;">default</div></div>
+          <div><div style="height:70px;background:var(--surface);border:1px solid var(--border-3);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.6);transform:translateY(-2px);"></div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:6px;text-align:center;">hover</div></div>
+          <div><div style="height:70px;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;box-shadow:0 0 0 3px rgba(0,226,138,.18);"></div><div class="mono" style="color:var(--muted);font-size:10px;margin-top:6px;text-align:center;">focus/selected</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reduced motion -->
+    <div class="rm" style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:22px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div class="mono" style="font-size:11px;color:var(--muted);letter-spacing:.1em;">REDUCED MOTION · static first frame · no autoplay · MSG chips still labeled</div>
+        <span class="mono" style="font-size:10px;padding:2px 7px;background:rgba(0,226,138,.12);color:var(--accent);border-radius:4px;border:1px solid rgba(0,226,138,.3);">prefers-reduced-motion: reduce</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="height:220px;background:#040507;border:1px solid var(--border-2);border-radius:12px;position:relative;overflow:hidden;" class="dot-bg">
+          <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 400 220" preserveAspectRatio="none">
+            <path d="M100 110 L 180 110" stroke="var(--border-3)"/>
+            <path d="M240 110 L 320 110" stroke="var(--border-3)"/>
+            <g><rect x="30" y="94" width="60" height="32" rx="5" fill="#0F1218" stroke="#5B8CFF"/><text x="60" y="114" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#B4D4FF">producer</text></g>
+            <g><rect x="180" y="60" width="60" height="100" rx="6" fill="#0F1218" stroke="#00E28A"/><text x="210" y="55" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#00E28A">queue</text><rect x="186" y="130" width="48" height="8" rx="1" fill="#00E28A"/><rect x="186" y="118" width="48" height="8" rx="1" fill="#00E28A" opacity=".7"/></g>
+            <g><rect x="320" y="94" width="60" height="32" rx="5" fill="#0F1218" stroke="#00E28A"/><text x="350" y="114" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#B4F4D0">consumer</text></g>
+            <!-- static MSG labels at positions (no motion) -->
+            <g transform="translate(140 110)"><rect x="-24" y="-9" width="48" height="18" rx="4" fill="#161A1F" stroke="#333947"/><text x="0" y="3" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#F2F4F7" font-weight="600">MSG 44</text></g>
+            <g transform="translate(280 110)"><rect x="-24" y="-9" width="48" height="18" rx="4" fill="#161A1F" stroke="#333947"/><text x="0" y="3" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#F2F4F7" font-weight="600">MSG 40</text></g>
+          </svg>
+          <div style="position:absolute;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;">
+            <span class="mono" style="font-size:10px;color:var(--muted);">static · tap Play to enable motion</span>
+            <button style="padding:8px 12px;background:var(--accent);color:#001910;border:0;border-radius:8px;font-size:12px;font-weight:600;">▶ Play</button>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border-2);border-radius:12px;padding:18px;font-size:13px;color:var(--text-2);line-height:1.7;">
+          <div class="mono" style="font-size:10px;color:var(--accent);letter-spacing:.1em;margin-bottom:10px;">FALLBACK RULES</div>
+          <ul style="padding-left:20px;margin:0;">
+            <li>No autoplay — every scene freezes on a labeled first frame.</li>
+            <li>Play stays visible; opting in re-enables motion for this session only.</li>
+            <li>Step forward/back always available; discrete states, no eased tweens.</li>
+            <li>Shimmer skeletons collapse to a solid "Loading…" label.</li>
+            <li>3D orbit disabled by default; a static isometric render is served.</li>
+            <li>MSG chips remain fully labeled at their static positions.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- footer -->
+  <div style="max-width:1440px;margin:60px auto 0;color:var(--muted);font-size:12px;text-align:center;padding-top:24px;border-top:1px solid var(--border);" class="mono">
+    SysViz v1 · AMOLED #000 · emerald #00E28A · Inter Tight + JetBrains Mono · Tailwind + shadcn/ui target · see <a href="docs/DESIGN_HANDOFF.md">docs/DESIGN_HANDOFF.md</a>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -57,5 +57,5 @@ they seem helpful.
 
 ## 7. Key references
 
-- `docs/VISION.md` · `docs/ARCHITECTURE.md` · `docs/CONTENT_MODEL.md` · `docs/CONTRIBUTING.md` · `docs/DESIGN_HANDOFF.md`
+- `docs/VISION.md` · `docs/ARCHITECTURE.md` · `docs/CONTENT_MODEL.md` · `docs/SCENE_FORMAT.md` · `docs/CONTRIBUTING.md` · `docs/DESIGN_HANDOFF.md`
 - Feature specs live in `specs/`. The current milestone is `specs/000-vertical-slice.md`.

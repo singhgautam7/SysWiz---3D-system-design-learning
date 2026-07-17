@@ -28,7 +28,8 @@ and mobile. No simulation engine, no accounts, no AI (see `docs/VISION.md` non-g
   `content:check` script) reading the two seed lessons in `content/`.
 - Home/library route listing lessons from content.
 - Lesson route rendering MDX body + the referenced visual (`dimension` decides which).
-- One 3D scene: `src/scenes/horizontal-vs-vertical-scaling/`.
+- The generic declarative **3D scene engine** (`src/scenes/_engine/`) per `docs/SCENE_FORMAT.md`: zod scene schema, `layered` layout, node kit, and `SceneRenderer`.
+- The seed 3D lesson rendered **from a scene file** (`content/scenes/horizontal-vs-vertical-scaling.scene.json`) through that renderer — plus a small lesson-level "scale up vs scale out" toggle in the chrome.
 - One 2D widget: a `MessageQueueViz` component in `src/components/`.
 - Responsive layout per `docs/CONTRIBUTING.md` (mobile-first).
 - Reduced-motion fallbacks.
@@ -43,7 +44,7 @@ and mobile. No simulation engine, no accounts, no AI (see `docs/VISION.md` non-g
 
 - [ ] `bun install && bun run dev` boots to a working home page listing exactly the two seed lessons.
 - [ ] Home shows category grouping, difficulty, and a 2D/3D badge per lesson.
-- [ ] `/concepts/horizontal-vs-vertical-scaling` renders the MDX explanation + interactive 3D scene with a scale-up/scale-out toggle; orbit + zoom work with mouse and touch.
+- [ ] `/concepts/horizontal-vs-vertical-scaling` renders the MDX explanation + interactive 3D scene **driven entirely by the scene file through the generic `SceneRenderer`**, with a scale-up/scale-out toggle; orbit + zoom work with mouse and touch. A second scene file must render with zero renderer changes.
 - [ ] `/concepts/message-queue` renders the MDX explanation + 2D queue animation with pause/step and a producer-rate control; queue visibly grows/drains.
 - [ ] Both lessons pass the content schema; `bun run content:check` is green.
 - [ ] Verified at 375px and desktop; visual stacks above text on mobile.

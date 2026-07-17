@@ -23,3 +23,12 @@ dist/
 .vercel
 coverage/
 .turbo
+*.tsbuildinfo
+.claude/
+.vscode/
+.idea/
+
+# package managers (use bun only)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

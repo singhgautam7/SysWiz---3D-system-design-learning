@@ -70,6 +70,7 @@ be pointed at [`CLAUDE.md`](CLAUDE.md), which links out to the rest.
 - [`docs/VISION.md`](docs/VISION.md) — what we're building and, more importantly, what we're **not**.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stack, folder conventions, the simulation boundary.
 - [`docs/CONTENT_MODEL.md`](docs/CONTENT_MODEL.md) — the MDX schema (the most important doc for content authors).
+- [`docs/SCENE_FORMAT.md`](docs/SCENE_FORMAT.md) — the declarative 3D scene format + generic renderer.
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — coding + performance guidelines, Definition of Done, PR checklist, **content-review gate**.
 - [`docs/DESIGN_HANDOFF.md`](docs/DESIGN_HANDOFF.md) — the template every design handoff must follow.
 - [`specs/`](specs/) — one spec file per feature. Start with [`specs/000-vertical-slice.md`](specs/000-vertical-slice.md).

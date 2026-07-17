@@ -27,7 +27,8 @@ Every lesson file starts with YAML frontmatter validated by `src/lib/content/sch
 | `category` | enum | ✅ | `concept` \| `system-design`. |
 | `subcategory` | string | ⬜ | e.g. `scaling`, `databases`, `messaging`, `caching`. Used for grouping. |
 | `dimension` | enum | ✅ | `2d` \| `3d`. Decides which visual pipeline renders. |
-| `sceneRef` | string | conditional | **Required if `dimension: 3d`.** Folder name under `src/scenes/`. |
+| `sceneRef` | string | conditional | For `dimension: 3d`: id of a **declarative scene file** at `content/scenes/<sceneRef>.scene.json`, rendered by the generic `SceneRenderer`. See `docs/SCENE_FORMAT.md`. Provide this **or** `sceneComponent`. |
+| `sceneComponent` | string | conditional | For `dimension: 3d` **escape hatch only**: name of a custom-coded scene under `src/scenes/<id>/`, used when the visual is a morph/transition the declarative format can't express (e.g. vertical-scaling "box grows"). Prefer `sceneRef`. |
 | `componentRef` | string | conditional | **Required if `dimension: 2d`.** Exported widget name from `src/components`. |
 | `difficulty` | enum | ✅ | `beginner` \| `intermediate` \| `advanced`. |
 | `tags` | string[] | ⬜ | Free-form, e.g. `["latency", "redis"]`. |
@@ -78,7 +79,7 @@ See `content/concepts/message-queue.mdx`.
 every file and fails if:
 
 - `id` ≠ filename,
-- `dimension: 3d` without a matching `src/scenes/<sceneRef>/`,
+- `dimension: 3d` with neither a matching `content/scenes/<sceneRef>.scene.json` nor a `sceneComponent` under `src/scenes/`,
 - `dimension: 2d` without a matching `componentRef`,
 - `reviewStatus: reviewed` but no reviewer recorded in the PR (checked in CI),
 - any required field missing.

@@ -1,0 +1,37 @@
+{
+  "version": "0.1",
+  "meta": {
+    "id": "vertical-scaling",
+    "title": "Vertical Scaling — One Bigger Machine"
+  },
+  "layout": { "type": "layered", "direction": "x", "spacing": 3.5 },
+  "camera": { "position": [8, 5, 12], "target": [1.75, 0, 0] },
+  "nodes": [
+    {
+      "id": "client",
+      "type": "client",
+      "label": "Clients",
+      "rank": 0,
+      "description": "Users sending requests to the system."
+    },
+    {
+      "id": "server",
+      "type": "server",
+      "label": "App Server",
+      "rank": 1,
+      "scale": 1.9,
+      "description": "A single, beefier machine: more CPU, RAM, and faster disk. No load balancer needed — but it's a single point of failure with a hard hardware ceiling."
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Database",
+      "rank": 2,
+      "description": "Shared source of truth."
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": "client", "to": "server", "flow": "request", "animated": true },
+    { "id": "e2", "from": "server", "to": "db", "flow": "data", "animated": true }
+  ]
+}

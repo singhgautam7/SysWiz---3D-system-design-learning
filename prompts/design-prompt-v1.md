@@ -56,6 +56,13 @@ v1 has no accounts, no AI, no backend — just content and interactivity.
 - Preferred accent / mood: _______ (leave blank for a calm blue-violet technical palette).
 - Light and/or dark: _______ (leave blank for both, dark as default).
 
+## 3D scenes — important boundary
+You (the design tool) do **not** render 3D. For any `dimension: 3d` lesson, show the 3D
+viewport as a **placeholder rectangle** with a short caption (e.g. "3D scene renders here").
+Design only the surrounding UI: the viewport frame, the control bar (toggles, play/pause,
+step, reset-camera), the explanation panel, and how it all reflows on mobile. The scene
+itself is defined by a data file and built in code — it is out of scope for the design.
+
 ## Hard requirements
 - **Mobile-first and fully responsive.** Provide frames at ~375px (mobile), ~768px (tablet),
   ~1280px (desktop).
